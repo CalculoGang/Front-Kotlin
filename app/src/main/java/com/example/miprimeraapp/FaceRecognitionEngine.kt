@@ -55,7 +55,7 @@ object FaceRecognitionEngine {
     fun reconocer(
         vector: List<Float>,
         personas: Map<String, List<List<Float>>>,
-        umbral: Float = 0.45f
+        umbral: Float = 0.20f
     ): Pair<String?, Float> {
         var mejorNombre: String? = null
         var mejorDist = Float.MAX_VALUE
