@@ -1,6 +1,7 @@
 package com.example.miprimeraapp
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
@@ -12,12 +13,16 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -28,55 +33,133 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetector
 import com.google.mlkit.vision.face.FaceDetectorOptions
-import java.util.concurrent.ExecutorService
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
-// ============================= COLORES DE LA APP =============================
 object AppColors {
     val BLANCO = Color.White
     val NARANJA = Color(0xFFFF9800)
+    val VERDE = Color(0xFF4CAF50)
+    val ROJO = Color(0xFFF44336)
+    val GRIS = Color(0xFF9E9E9E)
+    val FONDO_VECTOR = Color(0xFFF5F5F5)
     val TEXTO_OSCURO = Color(0xFF333333)
 }
 
+data class FaceUIState(
+    val hayRostro: Boolean = false,
+    val vector: List<Float> = emptyList(),
+    val nombreReconocido: String? = null,
+    val distancia: Float = Float.MAX_VALUE
+)
+
 class MainActivity : ComponentActivity() {
 
-    private lateinit var cameraExecutor: ExecutorService
+    private val personasDB = ConcurrentHashMap<String, MutableList<List<Float>>>()
+    private val faceUIState = mutableStateOf(FaceUIState())
+    private val cameraExecutor = Executors.newSingleThreadExecutor()
     private var faceDetector: FaceDetector? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        cameraExecutor = Executors.newSingleThreadExecutor()
-        inicializarDetectorRostros()
-        pedirPermisoCamara()
-
-        setContent {
-            PantallaReconocimientoFacial()
+        FaceStorage.cargar(this).forEach { (nombre, vectores) ->
+            personasDB[nombre] = vectores
         }
-    }
 
-    private fun inicializarDetectorRostros() {
         val options = FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
             .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
             .build()
-
         faceDetector = FaceDetection.getClient(options)
+
+        pedirPermisoCamara()
+
+        setContent {
+            PantallaReconocimientoFacial(
+                uiState = faceUIState.value,
+                onGuardar = ::guardarPersona,
+                onSetupCamera = ::setupCamera
+            )
+        }
+    }
+
+    private fun guardarPersona(nombre: String, vector: List<Float>) {
+        if (nombre.isBlank() || vector.isEmpty()) return
+        personasDB.getOrPut(nombre) { mutableListOf() }.add(vector)
+        FaceStorage.guardar(this, personasDB)
+    }
+
+    @SuppressLint("UnsafeOptInUsageError")
+    private fun setupCamera(previewView: PreviewView) {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        cameraProviderFuture.addListener({
+            try {
+                val cameraProvider = cameraProviderFuture.get()
+                val preview = Preview.Builder().build().also {
+                    it.setSurfaceProvider(previewView.surfaceProvider)
+                }
+                val analysis = ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
+                    .also { ia ->
+                        ia.setAnalyzer(cameraExecutor) { imageProxy ->
+                            procesarFrame(imageProxy)
+                        }
+                    }
+                cameraProvider.unbindAll()
+                cameraProvider.bindToLifecycle(
+                    this,
+                    CameraSelector.DEFAULT_FRONT_CAMERA,
+                    preview,
+                    analysis
+                )
+            } catch (e: Exception) {
+                Log.e("Camera", "Error configurando cámara: ${e.message}")
+            }
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+    @androidx.camera.core.ExperimentalGetImage
+    private fun procesarFrame(imageProxy: ImageProxy) {
+        val mediaImage = imageProxy.image
+        if (mediaImage == null) {
+            imageProxy.close()
+            return
+        }
+        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+        faceDetector?.process(image)
+            ?.addOnSuccessListener { rostros ->
+                if (rostros.isNotEmpty()) {
+                    val vector = FaceRecognitionEngine.extraerVector(rostros[0])
+                    if (vector != null) {
+                        val (nombre, dist) = FaceRecognitionEngine.reconocer(vector, personasDB)
+                        faceUIState.value = FaceUIState(
+                            hayRostro = true,
+                            vector = vector,
+                            nombreReconocido = nombre,
+                            distancia = dist
+                        )
+                    }
+                } else {
+                    faceUIState.value = FaceUIState(hayRostro = false)
+                }
+            }
+            ?.addOnFailureListener { e ->
+                Log.e("FaceDetect", "Error: ${e.message}")
+            }
+            ?.addOnCompleteListener {
+                imageProxy.close()
+            }
     }
 
     private fun pedirPermisoCamara() {
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.CAMERA
-            ) != PackageManager.PERMISSION_GRANTED
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+            != PackageManager.PERMISSION_GRANTED
         ) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.CAMERA),
-                PERMISO_CAMARA_REQUEST_CODE
-            )
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 10)
         }
     }
 
@@ -85,195 +168,160 @@ class MainActivity : ComponentActivity() {
         cameraExecutor.shutdown()
         faceDetector?.close()
     }
-
-    companion object {
-        private const val PERMISO_CAMARA_REQUEST_CODE = 10
-    }
 }
 
 @Composable
-fun PantallaReconocimientoFacial() {
-    var coordenadasRostro by remember { mutableStateOf("Detectando rostro...") }
+fun PantallaReconocimientoFacial(
+    uiState: FaceUIState,
+    onGuardar: (String, List<Float>) -> Unit,
+    onSetupCamera: (PreviewView) -> Unit
+) {
+    var mostrarDialogo by remember { mutableStateOf(false) }
+    var nombreInput by remember { mutableStateOf("") }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(AppColors.BLANCO),
-        contentAlignment = Alignment.Center
+            .background(AppColors.BLANCO)
+            .padding(top = 48.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column(
+        Text(
+            text = "Reconocimiento Facial",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = AppColors.TEXTO_OSCURO
+        )
+
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .fillMaxWidth()
+                .height(280.dp)
+                .background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            CameraPreview(onSetupCamera = onSetupCamera)
+        }
+
+        val (statusColor, statusText) = when {
+            !uiState.hayRostro -> Pair(AppColors.GRIS, "Sin rostro detectado")
+            uiState.nombreReconocido != null -> Pair(
+                AppColors.VERDE,
+                "Hola, ${uiState.nombreReconocido}!  (dist: ${"%.3f".format(uiState.distancia)})"
+            )
+            else -> Pair(
+                AppColors.ROJO,
+                "Persona desconocida  (dist: ${"%.3f".format(uiState.distancia)})"
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(statusColor, RoundedCornerShape(8.dp))
+                .padding(12.dp)
         ) {
             Text(
-                text = "Reconocimiento Facial",
-                fontSize = 28.sp,
+                text = statusText,
+                color = Color.White,
                 fontWeight = FontWeight.Bold,
-                color = AppColors.TEXTO_OSCURO
+                fontSize = 14.sp
             )
+        }
 
+        if (uiState.vector.isNotEmpty()) {
             Box(
                 modifier = Modifier
-                    .size(300.dp)
-                    .background(Color.Black)
-                    .padding(4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                CameraPreview()
-            }
-
-            Box(
-                modifier = Modifier
-                    .background(AppColors.NARANJA, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                    .padding(16.dp)
                     .fillMaxWidth()
+                    .background(AppColors.FONDO_VECTOR, RoundedCornerShape(8.dp))
+                    .padding(12.dp)
+            ) {
+                Column {
+                    Text(
+                        text = "Vector facial (${uiState.vector.size} valores, landmarks normalizados):",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = AppColors.TEXTO_OSCURO
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    val vectorStr = uiState.vector
+                        .chunked(4)
+                        .joinToString("\n") { row ->
+                            row.joinToString("  ") { "%.3f".format(it) }
+                        }
+                    Text(
+                        text = vectorStr,
+                        fontSize = 11.sp,
+                        color = Color(0xFF555555),
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
+
+        if (uiState.hayRostro) {
+            Button(
+                onClick = {
+                    nombreInput = uiState.nombreReconocido ?: ""
+                    mostrarDialogo = true
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = AppColors.NARANJA),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = coordenadasRostro,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
+                    text = if (uiState.nombreReconocido != null) "Actualizar registro" else "Registrar esta cara",
                     color = Color.White,
-                    modifier = Modifier.align(Alignment.CenterStart)
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
     }
+
+    if (mostrarDialogo) {
+        AlertDialog(
+            onDismissRequest = { mostrarDialogo = false },
+            title = { Text("Registrar persona") },
+            text = {
+                Column {
+                    Text("Ingresa el nombre para esta cara:")
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = nombreInput,
+                        onValueChange = { nombreInput = it },
+                        label = { Text("Nombre") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onGuardar(nombreInput, uiState.vector)
+                        mostrarDialogo = false
+                    },
+                    enabled = nombreInput.isNotBlank()
+                ) { Text("Guardar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarDialogo = false }) { Text("Cancelar") }
+            }
+        )
+    }
 }
 
 @Composable
-fun CameraPreview() {
+fun CameraPreview(onSetupCamera: (PreviewView) -> Unit) {
     val context = LocalContext.current
     val previewView = remember { PreviewView(context) }
 
     LaunchedEffect(Unit) {
-        configurarCamara(context, previewView)
+        onSetupCamera(previewView)
     }
 
     AndroidView(
         factory = { previewView },
-        modifier = Modifier
-            .size(300.dp)
-            .background(Color.Black)
+        modifier = Modifier.fillMaxSize()
     )
-}
-
-private fun configurarCamara(context: android.content.Context, previewView: PreviewView) {
-    val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-
-    cameraProviderFuture.addListener(
-        {
-            try {
-                val cameraProvider = cameraProviderFuture.get()
-
-                val preview = Preview.Builder()
-                    .build()
-                    .also {
-                        it.setSurfaceProvider(previewView.surfaceProvider)
-                    }
-
-                val imageAnalysis = ImageAnalysis.Builder()
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
-                    .also { analysis ->
-                        analysis.setAnalyzer(
-                            Executors.newSingleThreadExecutor()
-                        ) { imageProxy ->
-                            procesarFrameMLKit(imageProxy)
-                        }
-                    }
-
-                val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
-
-                cameraProvider.unbindAll()
-
-                cameraProvider.bindToLifecycle(
-                    context as androidx.lifecycle.LifecycleOwner,
-                    cameraSelector,
-                    preview,
-                    imageAnalysis
-                )
-
-            } catch (e: Exception) {
-                Log.e("CameraPreview", "Error configurando cámara: ${e.message}")
-            }
-        },
-        ContextCompat.getMainExecutor(context)
-    )
-}
-
-@androidx.camera.core.ExperimentalGetImage
-@Suppress("UNCHECKED_CAST")
-private fun procesarFrameMLKit(imageProxy: ImageProxy) {
-    try {
-        val mediaImage = imageProxy.image
-        if (mediaImage != null) {
-            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-
-            val detector = FaceDetection.getClient()
-
-            detector.process(image)
-                .addOnSuccessListener { rostros ->
-                    if (rostros.isNotEmpty()) {
-                        val rostro = rostros[0]
-
-                        Log.d("FaceDetection", "=== ROSTRO DETECTADO ===")
-                        Log.d("FaceDetection", "Posición: X=${rostro.boundingBox.left}, Y=${rostro.boundingBox.top}")
-                        Log.d("FaceDetection", "Ancho: ${rostro.boundingBox.width()}, Alto: ${rostro.boundingBox.height()}")
-
-                        Log.d("FaceDetection", "--- PUNTOS DEL ROSTRO ---")
-
-                        for (landmark in rostro.allLandmarks) {
-                            val tipo = when (landmark.landmarkType) {
-                                0 -> "OJO IZQUIERDO"
-                                1 -> "OJO DERECHO"
-                                2 -> "NARIZ"
-                                3 -> "BOCA IZQUIERDA"
-                                4 -> "BOCA DERECHA"
-                                5 -> "BOCA CENTRO"
-                                6 -> "OREJA IZQUIERDA"
-                                7 -> "OREJA DERECHA"
-                                8 -> "MEJILLA IZQUIERDA"
-                                9 -> "MEJILLA DERECHA"
-                                else -> "DESCONOCIDO"
-                            }
-
-                            val x = landmark.position.x.toInt()
-                            val y = landmark.position.y.toInt()
-
-                            Log.d("FaceDetection", "$tipo: ($x, $y)")
-                        }
-
-                        Log.d("FaceDetection", "Rotación Z: ${rostro.headEulerAngleZ}°")
-                        Log.d("FaceDetection", "Rotación Y: ${rostro.headEulerAngleY}°")
-                        Log.d("FaceDetection", "Distancia entre ojos: ${calcularDistanciaOjos(rostro)}")
-
-                    } else {
-                        Log.d("FaceDetection", "No se detectó rostro")
-                    }
-                }
-                .addOnFailureListener { e ->
-                    Log.e("FaceDetection", "Error procesando imagen: ${e.message}")
-                }
-        }
-    } catch (e: Exception) {
-        Log.e("FaceDetection", "Error: ${e.message}")
-    } finally {
-        imageProxy.close()
-    }
-}
-
-private fun calcularDistanciaOjos(rostro: com.google.mlkit.vision.face.Face): Float {
-    val ojoIzquierdo = rostro.getLandmark(com.google.mlkit.vision.face.FaceLandmark.LEFT_EYE)?.position
-    val ojoDerecho = rostro.getLandmark(com.google.mlkit.vision.face.FaceLandmark.RIGHT_EYE)?.position
-
-    return if (ojoIzquierdo != null && ojoDerecho != null) {
-        val dx = ojoDerecho.x - ojoIzquierdo.x
-        val dy = ojoDerecho.y - ojoIzquierdo.y
-        kotlin.math.sqrt(dx * dx + dy * dy)
-    } else {
-        0f
-    }
 }
