@@ -59,6 +59,7 @@ class MainActivity : ComponentActivity() {
     private val faceUIState = mutableStateOf(FaceUIState())
     private val cameraExecutor = Executors.newSingleThreadExecutor()
     private var faceDetector: FaceDetector? = null
+    private var faceEmbedder: FaceEmbedder? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,6 +67,12 @@ class MainActivity : ComponentActivity() {
 
         FaceStorage.cargar(this).forEach { (nombre, vectores) ->
             personasDB[nombre] = vectores
+        }
+
+        try {
+            faceEmbedder = FaceEmbedder(this)
+        } catch (e: Exception) {
+            Log.e("FaceEmbedder", "No se pudo cargar el modelo .tflite: ${e.message}")
         }
 
         val options = FaceDetectorOptions.Builder()
@@ -131,17 +138,27 @@ class MainActivity : ComponentActivity() {
         }
         val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
         faceDetector?.process(image)
-            ?.addOnSuccessListener { rostros ->
-                if (rostros.isNotEmpty()) {
-                    val vector = FaceRecognitionEngine.extraerVector(rostros[0])
-                    if (vector != null) {
-                        val (nombre, dist) = FaceRecognitionEngine.reconocer(vector, personasDB)
-                        faceUIState.value = FaceUIState(
-                            hayRostro = true,
-                            vector = vector,
-                            nombreReconocido = nombre,
-                            distancia = dist
+            ?.addOnSuccessListener(cameraExecutor) { rostros ->
+                val embedder = faceEmbedder
+                if (rostros.isNotEmpty() && embedder != null) {
+                    try {
+                        val bmp = ImageUtils.rotate(
+                            ImageUtils.toBitmap(imageProxy),
+                            imageProxy.imageInfo.rotationDegrees
                         )
+                        val face = ImageUtils.cropFace(bmp, rostros[0].boundingBox)
+                        if (face != null) {
+                            val vector = embedder.embed(face).toList()
+                            val (nombre, dist) = FaceRecognitionEngine.reconocer(vector, personasDB)
+                            faceUIState.value = FaceUIState(
+                                hayRostro = true,
+                                vector = vector,
+                                nombreReconocido = nombre,
+                                distancia = dist
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.e("FaceEmbed", "Error generando embedding: ${e.message}")
                     }
                 } else {
                     faceUIState.value = FaceUIState(hayRostro = false)
@@ -167,6 +184,7 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
         cameraExecutor.shutdown()
         faceDetector?.close()
+        faceEmbedder?.close()
     }
 }
 
@@ -240,7 +258,7 @@ fun PantallaReconocimientoFacial(
             ) {
                 Column {
                     Text(
-                        text = "Vector facial (${uiState.vector.size} valores, landmarks normalizados):",
+                        text = "Embedding facial (${uiState.vector.size} valores):",
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,
                         color = AppColors.TEXTO_OSCURO

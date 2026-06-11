@@ -37,6 +37,10 @@ android {
     buildFeatures {
         compose = true
     }
+    androidResources {
+        // .tflite must stay uncompressed so the interpreter can mmap it.
+        noCompress += "tflite"
+    }
 }
 
 dependencies {
@@ -58,6 +62,10 @@ dependencies {
 
     // ML Kit
     implementation("com.google.mlkit:face-detection:16.1.7")
+
+    // TensorFlow Lite (face embedding)
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 
     testImplementation(libs.junit)
 
