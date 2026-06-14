@@ -24,4 +24,5 @@ object KigoColors {
     val Border        = Color(0xFFE5E7EB)
     val CardBg        = Color(0xFFF9FAFB)
     val Pending       = Color(0xFF9CA3AF)
+    val AppBg         = Color(0xFFF0F0F5)
 }

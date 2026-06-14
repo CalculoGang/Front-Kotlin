@@ -1,23 +1,33 @@
 package com.example.miprimeraapp.ui.screens
 
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import com.example.miprimeraapp.R
 import com.example.miprimeraapp.model.FaceUIState
 import com.example.miprimeraapp.ui.components.*
 import com.example.miprimeraapp.ui.theme.KigoColors
@@ -29,208 +39,369 @@ fun VoiceScreen(
     onSetupCamera : (PreviewView) -> Unit,
     onBack        : () -> Unit
 ) {
-    var micActive      by remember { mutableStateOf(false) }
+    var micActive      by remember { mutableStateOf(true) }
     var mostrarDialogo by remember { mutableStateOf(false) }
     var nombreInput    by remember { mutableStateOf("") }
 
-    Column(modifier = Modifier.fillMaxSize().background(KigoColors.Surface)) {
-
-        VoiceTopBar(onBack = onBack)
-
-        CameraPanel(
-            faceUIState   = faceUIState,
-            onSetupCamera = onSetupCamera,
-            onRegisterTap = {
-                nombreInput = faceUIState.nombreReconocido ?: ""
-                mostrarDialogo = true
-            }
+    // Conversation messages — replace with live speech engine output
+    val messages = remember {
+        mutableStateListOf<ChatMessage>(
+            ChatMessage.Kigo("Cual es el motivo de su visita hoy?"),
+            ChatMessage.User("Vengo a visitar a David."),
+            ChatMessage.Kigo("Encontre al residente. Notificando ahora."),
+            ChatMessage.ResidentFound("David Hernandez", "Calle Pino #14"),
+            ChatMessage.Typing
         )
+    }
 
-        Column(
-            modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(KigoColors.AppBg)
+    ) {
+        KigoAppleHeader()
+
+        // Upper zone: camera (left), background space (right)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
         ) {
-            AiDataPanel()
-            HorizontalDivider(color = KigoColors.Border)
-            AssistantChatPanel()
+            PortraitCameraBlock(
+                faceUIState   = faceUIState,
+                onSetupCamera = onSetupCamera,
+                onRegisterTap = {
+                    nombreInput    = faceUIState.nombreReconocido ?: ""
+                    mostrarDialogo = true
+                },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 20.dp, top = 8.dp)
+                    .width(155.dp)
+                    .fillMaxHeight(0.92f)
+            )
         }
 
-        MicControls(micActive = micActive, onMicToggle = { micActive = !micActive })
+        // Chat zone: mascot floats above card, glass card fills zone
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(330.dp)
+        ) {
+            GlassChatCard(
+                messages     = messages,
+                quickActions = listOf("Llamar a David", "Cancelar visita"),
+                modifier     = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 14.dp)
+            )
+
+            // Drawn after card → renders on top; negative Y offset floats into camera zone above
+            MascotImage(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(end = 30.dp)
+                    .offset(y = (-185).dp)
+                    .size(215.dp)
+                    .zIndex(5f)
+            )
+        }
+
+        AppleBottomNav(
+            micActive   = micActive,
+            onMicToggle = { micActive = !micActive },
+            onHome      = onBack,
+            modifier    = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
     }
 
     if (mostrarDialogo) {
         RegisterFaceDialog(
-            nombreInput    = nombreInput,
-            onNameChange   = { nombreInput = it },
-            onConfirm      = { onGuardarFace(nombreInput, faceUIState.vector); mostrarDialogo = false },
-            onDismiss      = { mostrarDialogo = false }
+            nombreInput  = nombreInput,
+            onNameChange = { nombreInput = it },
+            onConfirm    = { onGuardarFace(nombreInput, faceUIState.vector); mostrarDialogo = false },
+            onDismiss    = { mostrarDialogo = false }
         )
     }
 }
 
-// ─── Sub-composables ──────────────────────────────────────────────────────────
+// ─── Header ───────────────────────────────────────────────────────────────────
 
 @Composable
-private fun VoiceTopBar(onBack: () -> Unit) {
-    Row(
-        modifier              = Modifier.fillMaxWidth().background(KigoColors.BgDark).padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment     = Alignment.CenterVertically
+private fun KigoAppleHeader() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.size(8.dp).background(KigoColors.VoiceGreen, CircleShape))
-            Text("Kigo Kiosk", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StepPips(total = 5, current = 1, accentColor = KigoColors.VoiceGreen)
-            IconButton(onClick = onBack, modifier = Modifier.size(32.dp)) {
-                Text("✕", color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp)
-            }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text          = "KIGO",
+                fontSize      = 22.sp,
+                fontWeight    = FontWeight.Bold,
+                color         = KigoColors.KigoRed,
+                letterSpacing = (-0.5).sp
+            )
+            Text(
+                text          = "LAS CUMBRES",
+                fontSize      = 9.sp,
+                fontWeight    = FontWeight.SemiBold,
+                color         = Color(0xFF9CA3AF),
+                letterSpacing = 1.8.sp
+            )
         }
     }
 }
 
+// ─── Portrait camera block ────────────────────────────────────────────────────
+
 @Composable
-private fun CameraPanel(
+private fun PortraitCameraBlock(
     faceUIState   : FaceUIState,
     onSetupCamera : (PreviewView) -> Unit,
-    onRegisterTap : () -> Unit
+    onRegisterTap : () -> Unit,
+    modifier      : Modifier = Modifier
 ) {
+    val recTransition = rememberInfiniteTransition(label = "rec")
+    val recAlpha by recTransition.animateFloat(
+        initialValue  = 1f,
+        targetValue   = 0.3f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(1400),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "recDot"
+    )
+
     Box(
-        modifier = Modifier.fillMaxWidth().height(220.dp).background(Color.Black)
+        modifier = modifier
+            .shadow(12.dp, RoundedCornerShape(26.dp), ambientColor = Color.Black.copy(alpha = 0.22f))
+            .clip(RoundedCornerShape(26.dp))
+            .background(Color(0xFF17172A))
     ) {
         CameraPreview(onSetupCamera = onSetupCamera)
 
+        // Face recognition status chip (tap to register face)
         val (chipColor, chipText) = when {
             !faceUIState.hayRostro               -> Pair(Color.Black.copy(alpha = 0.6f), "Sin rostro")
             faceUIState.nombreReconocido != null -> Pair(KigoColors.VoiceGreen.copy(alpha = 0.85f), faceUIState.nombreReconocido!!)
             else                                 -> Pair(KigoColors.KigoRed.copy(alpha = 0.85f), "Desconocido")
         }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart).padding(10.dp)
-                .background(chipColor, RoundedCornerShape(6.dp))
-                .clip(RoundedCornerShape(6.dp))
-                .clickable(enabled = faceUIState.hayRostro, onClick = onRegisterTap)
-                .padding(horizontal = 10.dp, vertical = 4.dp)
-        ) {
-            Text(chipText, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        }
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd).padding(10.dp)
-                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                Box(Modifier.size(6.dp).background(KigoColors.KigoRed, CircleShape))
-                Text("CÁMARA EN VIVO", color = Color.White, fontSize = 9.sp, letterSpacing = 0.5.sp)
+        if (faceUIState.hayRostro) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(chipColor)
+                    .clickable(onClick = onRegisterTap)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(chipText, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
         }
 
-        CamCorner(Alignment.TopStart)
-        CamCorner(Alignment.TopEnd)
-        CamCorner(Alignment.BottomStart)
-        CamCorner(Alignment.BottomEnd)
-    }
-}
-
-@Composable
-private fun AiDataPanel() {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text("Datos extraídos por IA", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = KigoColors.TextSecondary, letterSpacing = 0.5.sp)
-        DataExtractRow(icon = "👤", field = "Nombre completo",   value = "Esperando...")
-        DataExtractRow(icon = "🏢", field = "Empresa",           value = "Esperando...")
-        DataExtractRow(icon = "📋", field = "Motivo de visita",  value = "Esperando...")
-        DataExtractRow(icon = "📞", field = "Persona a visitar", value = "Esperando...")
-        DataExtractRow(icon = "🪪", field = "Identificación",    value = "Esperando...")
-    }
-}
-
-@Composable
-private fun AssistantChatPanel() {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text("Asistente de Registro", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = KigoColors.TextPrimary)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            Box(
-                modifier = Modifier.size(32.dp).background(KigoColors.VoiceGreen.copy(alpha = 0.12f), CircleShape),
-                contentAlignment = Alignment.Center
+        // Bottom bar: LIVE pulsing dot
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 11.dp, vertical = 11.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment     = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                Text("K", color = KigoColors.VoiceGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(KigoColors.KigoRed.copy(alpha = recAlpha), CircleShape)
+                )
+                Text(
+                    text          = "LIVE",
+                    color         = Color.White.copy(alpha = 0.38f),
+                    fontSize      = 8.sp,
+                    fontWeight    = FontWeight.Bold,
+                    letterSpacing = 1.5.sp
+                )
             }
             Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .background(KigoColors.CardBg, RoundedCornerShape(0.dp, 12.dp, 12.dp, 12.dp))
-                    .border(1.dp, KigoColors.Border, RoundedCornerShape(0.dp, 12.dp, 12.dp, 12.dp))
-                    .padding(12.dp)
-            ) {
-                Text(
-                    "¡Hola! Soy Kigo, tu asistente de registro. Presiona el micrófono y dime tu nombre completo para comenzar.",
-                    fontSize = 13.sp, color = KigoColors.TextPrimary, lineHeight = 20.sp
-                )
+                    .size(13.dp)
+                    .background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(3.dp))
+            )
+        }
+    }
+}
+
+// ─── Mascot image with float animation ───────────────────────────────────────
+
+@Composable
+private fun MascotImage(modifier: Modifier = Modifier) {
+    val floatTransition = rememberInfiniteTransition(label = "mascot")
+    val floatY by floatTransition.animateFloat(
+        initialValue  = 0f,
+        targetValue   = -8f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(5000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "float"
+    )
+
+    Image(
+        painter            = painterResource(R.drawable.dog_chat),
+        contentDescription = "KIGO",
+        contentScale       = ContentScale.Fit,
+        modifier           = modifier.offset(y = floatY.dp)
+    )
+}
+
+// ─── Glass chat card ──────────────────────────────────────────────────────────
+
+@Composable
+private fun GlassChatCard(
+    messages     : List<ChatMessage>,
+    quickActions : List<String>,
+    modifier     : Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .shadow(8.dp, RoundedCornerShape(28.dp), ambientColor = Color.Black.copy(alpha = 0.07f))
+            .clip(RoundedCornerShape(28.dp))
+            .background(Color.White.copy(alpha = 0.88f))
+    ) {
+        ConversationList(
+            messages = messages,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        )
+
+        Row(
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            quickActions.forEach { label ->
+                QuickActionChip(label = label, onClick = {})
             }
         }
     }
 }
 
+// ─── Bottom navigation ────────────────────────────────────────────────────────
+
 @Composable
-private fun MicControls(micActive: Boolean, onMicToggle: () -> Unit) {
-    Column(
-        modifier = Modifier
+private fun AppleBottomNav(
+    micActive   : Boolean,
+    onMicToggle : () -> Unit,
+    onHome      : () -> Unit,
+    modifier    : Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
             .fillMaxWidth()
-            .background(KigoColors.CardBg)
-            .border(1.dp, KigoColors.Border)
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .shadow(4.dp, RoundedCornerShape(999.dp), ambientColor = Color.Black.copy(alpha = 0.07f))
+            .background(Color.White.copy(alpha = 0.76f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceAround,
+        verticalAlignment     = Alignment.CenterVertically
     ) {
-        Row(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White, RoundedCornerShape(10.dp))
-                .border(1.dp, KigoColors.Border, RoundedCornerShape(10.dp))
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+                .size(44.dp)
+                .background(KigoColors.KigoRed, CircleShape)
+                .clickable(onClick = onHome),
+            contentAlignment = Alignment.Center
         ) {
-            if (micActive) {
-                repeat(5) {
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 2.dp)
-                            .size(width = 3.dp, height = (8 + it * 4).dp)
-                            .background(KigoColors.VoiceGreen, RoundedCornerShape(2.dp))
-                    )
-                }
-                Spacer(Modifier.width(10.dp))
-                Text("Escuchando...", fontSize = 13.sp, color = KigoColors.VoiceGreen, fontWeight = FontWeight.Medium)
-            } else {
-                Text("Presiona el micrófono para ", fontSize = 13.sp, color = KigoColors.TextSecondary)
-                Text("iniciar", fontSize = 13.sp, color = KigoColors.VoiceGreen, fontWeight = FontWeight.SemiBold)
-            }
+            Icon(
+                imageVector        = Icons.Filled.Home,
+                contentDescription = "Inicio",
+                tint               = Color.White,
+                modifier           = Modifier.size(20.dp)
+            )
         }
 
         Box(
             modifier = Modifier
                 .size(64.dp)
-                .background(if (micActive) KigoColors.VoiceGreen else KigoColors.KigoRed, CircleShape)
+                .offset(y = (-10).dp)
+                .shadow(
+                    elevation    = if (micActive) 16.dp else 4.dp,
+                    shape        = CircleShape,
+                    ambientColor = KigoColors.KigoRed.copy(alpha = if (micActive) 0.46f else 0.1f)
+                )
+                .background(KigoColors.KigoRed, CircleShape)
                 .clickable(onClick = onMicToggle),
             contentAlignment = Alignment.Center
         ) {
-            Text("🎤", fontSize = 26.sp)
+            if (micActive) {
+                WaveformBars()
+            } else {
+                Icon(
+                    imageVector        = Icons.Filled.Mic,
+                    contentDescription = "Microfono",
+                    tint               = Color.White,
+                    modifier           = Modifier.size(26.dp)
+                )
+            }
         }
 
-        Text("Toca para hablar · Kigo AI v2.4", fontSize = 11.sp, color = KigoColors.TextSecondary)
+        Box(
+            modifier         = Modifier.size(44.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector        = Icons.Outlined.Settings,
+                contentDescription = "Configuracion",
+                tint               = Color(0xFF9CA3AF),
+                modifier           = Modifier.size(22.dp)
+            )
+        }
     }
 }
+
+// ─── Mic waveform bars ────────────────────────────────────────────────────────
+
+@Composable
+private fun WaveformBars() {
+    val transition = rememberInfiniteTransition(label = "waveform")
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+        modifier              = Modifier.height(20.dp)
+    ) {
+        repeat(5) { i ->
+            val height by transition.animateFloat(
+                initialValue  = 5f,
+                targetValue   = 18f,
+                animationSpec = infiniteRepeatable(
+                    animation  = tween(800, delayMillis = i * 120, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "bar$i"
+            )
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(height.dp)
+                    .background(Color.White, RoundedCornerShape(99.dp))
+            )
+        }
+    }
+}
+
+// ─── Register face dialog ─────────────────────────────────────────────────────
 
 @Composable
 private fun RegisterFaceDialog(
@@ -241,8 +412,8 @@ private fun RegisterFaceDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Registrar persona") },
-        text  = {
+        title  = { Text("Registrar persona") },
+        text   = {
             Column {
                 Text("Ingresa el nombre para esta cara:")
                 Spacer(Modifier.height(8.dp))
