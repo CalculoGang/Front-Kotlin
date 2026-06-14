@@ -42,7 +42,7 @@ Welcome → Mode Select → Touch Form (4 pasos) → Success
 | **Welcome** | Pantalla de bienvenida con reloj en vivo |
 | **Mode Select** | El usuario elige Táctil o Voz. Voz solicita permiso de micrófono aquí |
 | **Touch Form** | Formulario de 4 pasos: datos personales → visita → ID → confirmación |
-| **Voice** | Cámara frontal activa con reconocimiento facial + controles de micrófono |
+| **Voice** | Cámara frontal + reconocimiento facial + conversación por voz en tiempo real (SpeechRecognizer) |
 | **Success** | Ticket de acceso con código QR (placeholder) |
 
 ---
@@ -65,15 +65,19 @@ app/src/main/java/com/example/miprimeraapp/
 │   │   └── Type.kt              # Tipografía base
 │   │
 │   ├── components/
-│   │   └── Components.kt        # Composables reutilizables entre pantallas
-│   │                            # (BackChip, StepPips, KigoTextField, KigoDropdown,
-│   │                            #  ConfirmRow, CamCorner, DataExtractRow, ModeCard…)
+│   │   ├── Components.kt        # Composables reutilizables entre pantallas
+│   │   │                        # (BackChip, StepPips, KigoTextField, KigoDropdown,
+│   │   │                        #  ConfirmRow, CamCorner, DataExtractRow, ModeCard…)
+│   │   └── ChatComponents.kt    # ChatMessage sealed class + todos los bubbles del chat
+│   │                            # (KigoBubble, UserBubble, UserPartialBubble, TypingBubble,
+│   │                            #  ResidentCardBubble, QuickActionChip, ConversationList)
 │   │
 │   └── screens/
 │       ├── WelcomeScreen.kt
 │       ├── ModeSelectScreen.kt  # Incluye AudioPermissionDialog
 │       ├── TouchFormScreen.kt   # Steps: Step1Personal, Step2Visit, Step3Id, Step4Confirm
-│       ├── VoiceScreen.kt       # CameraPanel, AiDataPanel, AssistantChatPanel, MicControls
+│       ├── VoiceScreen.kt       # Cámara + SpeechRecognizer + chat en vivo (ver docs/)
+│       ├── SpeechTestScreen.kt  # Pantalla de prueba STT independiente
 │       └── SuccessScreen.kt     # TicketCard con QR placeholder
 │
 ├── FaceEmbedder.kt              # Carga modelo .tflite, genera embedding 128-dim
@@ -167,12 +171,24 @@ private const val THRESHOLD = 0.20f  // menor = más estricto
 
 ---
 
+## VoiceScreen — conversación por voz
+
+`VoiceScreen` usa `SpeechRecognizer` nativo de Android para convertir voz a texto en tiempo real. Ver documentación completa en [`docs/VoiceScreen.md`](docs/VoiceScreen.md).
+
+Flujo resumido:
+1. Usuario toca botón mic → `startListening()`
+2. Mientras habla → resultados parciales aparecen como burbuja roja semitransparente (feedback en vivo)
+3. Al terminar → burbuja se confirma, Kigo responde `"(audio recibido)"` tras 1.5 s
+4. Volver a tocar mic → detiene escucha
+
+---
+
 ## Permisos
 
 | Permiso | Cuándo se pide |
 |---|---|
 | `CAMERA` | Al arrancar la app (`MainActivity.onCreate`) |
-| `RECORD_AUDIO` | Al seleccionar modo Voz (`ModeSelectScreen`) con diálogo de contexto |
+| `RECORD_AUDIO` | Al seleccionar modo Voz (`ModeSelectScreen`) y al tocar mic en `VoiceScreen` |
 
 ---
 
