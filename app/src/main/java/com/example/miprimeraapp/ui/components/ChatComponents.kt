@@ -95,8 +95,7 @@ fun KigoBubble(text: String) {
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.82f)
-                .shadow(2.dp, shape, ambientColor = Color.Black.copy(alpha = 0.05f))
-                .background(Color.White, shape)
+                .background(Color(0xFFEEEEF4), shape)
                 .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
             Text(text = text, fontSize = 14.sp, lineHeight = 20.sp, color = Color(0xFF1C1C1E))
