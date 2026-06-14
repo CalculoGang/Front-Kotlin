@@ -22,7 +22,8 @@ fun KigoApp(
 ) {
     when (currentScreen) {
         AppScreen.WELCOME     -> WelcomeScreen(
-            onStart = { onNavigate(AppScreen.MODE_SELECT) }
+            onStart      = { onNavigate(AppScreen.MODE_SELECT) },
+            onTestSpeech = { onNavigate(AppScreen.SPEECH_TEST) }
         )
         AppScreen.MODE_SELECT -> ModeSelectScreen(
             onBack        = { onNavigate(AppScreen.WELCOME) },
@@ -47,6 +48,9 @@ fun KigoApp(
                 onFormUpdate(TouchFormData())
                 onNavigate(AppScreen.WELCOME)
             }
+        )
+        AppScreen.SPEECH_TEST -> SpeechTestScreen(
+            onBack = { onNavigate(AppScreen.WELCOME) }
         )
     }
 }

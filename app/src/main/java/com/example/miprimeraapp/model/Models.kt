@@ -1,6 +1,6 @@
 package com.example.miprimeraapp.model
 
-enum class AppScreen { WELCOME, MODE_SELECT, TOUCH_FORM, VOICE, SUCCESS }
+enum class AppScreen { WELCOME, MODE_SELECT, TOUCH_FORM, VOICE, SUCCESS, SPEECH_TEST }
 
 data class TouchFormData(
     val nombre      : String = "",

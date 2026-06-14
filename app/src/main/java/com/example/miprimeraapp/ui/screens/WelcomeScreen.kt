@@ -26,7 +26,7 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun WelcomeScreen(onStart: () -> Unit) {
+fun WelcomeScreen(onStart: () -> Unit, onTestSpeech: () -> Unit = {}) {
     var timeText by remember { mutableStateOf(currentTime()) }
     LaunchedEffect(Unit) {
         while (true) { delay(1000); timeText = currentTime() }
@@ -77,6 +77,10 @@ fun WelcomeScreen(onStart: () -> Unit) {
                 ) {
                     Text("Tengo cita previa", color = Color.White.copy(alpha = 0.8f), fontSize = 15.sp)
                 }
+            }
+
+            androidx.compose.material3.TextButton(onClick = onTestSpeech) {
+                Text("🎤 Probar reconocimiento de voz", color = Color.White.copy(alpha = 0.30f), fontSize = 11.sp)
             }
 
             Text("KIGO SELF CHECK-IN AI · v2.4", color = Color.White.copy(alpha = 0.25f), fontSize = 10.sp, letterSpacing = 1.sp)
