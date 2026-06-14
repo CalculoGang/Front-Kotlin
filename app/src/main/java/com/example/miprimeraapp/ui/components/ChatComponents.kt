@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +30,7 @@ import com.example.miprimeraapp.ui.theme.KigoColors
 sealed class ChatMessage {
     data class Kigo(val text: String) : ChatMessage()
     data class User(val text: String) : ChatMessage()
+    data class UserPartial(val text: String) : ChatMessage()
     data class ResidentFound(
         val name: String,
         val address: String,
@@ -61,6 +63,7 @@ fun ConversationList(
                     }
                 }
                 is ChatMessage.User -> UserBubble(text = msg.text)
+                is ChatMessage.UserPartial -> UserPartialBubble(text = msg.text)
                 is ChatMessage.ResidentFound -> ResidentCardBubble(
                     name = msg.name,
                     address = msg.address,
@@ -119,6 +122,32 @@ fun UserBubble(text: String) {
                 .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
             Text(text = text, fontSize = 14.sp, lineHeight = 20.sp, color = Color.White)
+        }
+    }
+}
+
+// ─── User partial bubble (live transcription) ─────────────────────────────────
+
+@Composable
+fun UserPartialBubble(text: String) {
+    val shape = RoundedCornerShape(18.dp, 18.dp, 5.dp, 18.dp)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.76f)
+                .background(KigoColors.KigoRed.copy(alpha = 0.45f), shape)
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+        ) {
+            Text(
+                text      = text,
+                fontSize  = 14.sp,
+                lineHeight = 20.sp,
+                color     = Color.White.copy(alpha = 0.85f),
+                fontStyle = FontStyle.Italic
+            )
         }
     }
 }

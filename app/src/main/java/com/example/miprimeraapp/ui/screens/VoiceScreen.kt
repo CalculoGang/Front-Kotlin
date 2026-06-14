@@ -84,9 +84,13 @@ fun VoiceScreen(
             override fun onRmsChanged(rmsdB: Float) {}
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
-            override fun onError(error: Int) { micActive = false }
+            override fun onError(error: Int) {
+                micActive = false
+                messages.removeAll { it is ChatMessage.UserPartial }
+            }
             override fun onResults(results: Bundle?) {
                 micActive = false
+                messages.removeAll { it is ChatMessage.UserPartial }
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 if (!matches.isNullOrEmpty()) {
                     messages.add(ChatMessage.User(matches[0]))
@@ -98,7 +102,13 @@ fun VoiceScreen(
                     }
                 }
             }
-            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onPartialResults(partialResults: Bundle?) {
+                val partial = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!partial.isNullOrEmpty() && partial[0].isNotBlank()) {
+                    messages.removeAll { it is ChatMessage.UserPartial }
+                    messages.add(ChatMessage.UserPartial(partial[0]))
+                }
+            }
             override fun onEvent(eventType: Int, params: Bundle?) {}
         })
         onDispose {
