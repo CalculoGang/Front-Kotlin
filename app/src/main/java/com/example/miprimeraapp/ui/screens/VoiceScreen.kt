@@ -315,22 +315,11 @@ private fun PortraitCameraBlock(
 
 @Composable
 private fun MascotImage(modifier: Modifier = Modifier) {
-    val floatTransition = rememberInfiniteTransition(label = "mascot")
-    val floatY by floatTransition.animateFloat(
-        initialValue  = 0f,
-        targetValue   = -8f,
-        animationSpec = infiniteRepeatable(
-            animation  = tween(5000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "float"
-    )
-
     Image(
         painter            = painterResource(R.drawable.dog_chat),
         contentDescription = "KIGO",
         contentScale       = ContentScale.Fit,
-        modifier           = modifier.offset(y = floatY.dp)
+        modifier           = modifier
     )
 }
 
