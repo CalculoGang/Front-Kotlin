@@ -1,5 +1,14 @@
 package com.example.miprimeraapp.ui.screens
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
@@ -22,15 +31,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.core.content.ContextCompat
 import com.example.miprimeraapp.R
 import com.example.miprimeraapp.model.FaceUIState
 import com.example.miprimeraapp.ui.components.*
 import com.example.miprimeraapp.ui.theme.KigoColors
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.util.Locale
 
 @Composable
 fun VoiceScreen(
@@ -39,19 +53,74 @@ fun VoiceScreen(
     onSetupCamera : (PreviewView) -> Unit,
     onBack        : () -> Unit
 ) {
-    var micActive      by remember { mutableStateOf(true) }
+    val context        = LocalContext.current
+    val scope          = rememberCoroutineScope()
+    var micActive      by remember { mutableStateOf(false) }
     var mostrarDialogo by remember { mutableStateOf(false) }
     var nombreInput    by remember { mutableStateOf("") }
+    var hasPermission  by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED
+        )
+    }
 
-    // Conversation messages — replace with live speech engine output
     val messages = remember {
         mutableStateListOf<ChatMessage>(
-            ChatMessage.Kigo("Cual es el motivo de su visita hoy?"),
-            ChatMessage.User("Vengo a visitar a David."),
-            ChatMessage.Kigo("Encontre al residente. Notificando ahora."),
-            ChatMessage.ResidentFound("David Hernandez", "Calle Pino #14"),
-            ChatMessage.Typing
+            ChatMessage.Kigo("Hola! Cual es el motivo de su visita hoy?")
         )
+    }
+
+    val permLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> hasPermission = granted }
+
+    val recognizer = remember { SpeechRecognizer.createSpeechRecognizer(context) }
+
+    DisposableEffect(Unit) {
+        recognizer.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) { micActive = true }
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {}
+            override fun onError(error: Int) { micActive = false }
+            override fun onResults(results: Bundle?) {
+                micActive = false
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!matches.isNullOrEmpty()) {
+                    messages.add(ChatMessage.User(matches[0]))
+                    messages.add(ChatMessage.Typing)
+                    scope.launch {
+                        delay(1500L)
+                        messages.remove(ChatMessage.Typing)
+                        messages.add(ChatMessage.Kigo("(audio recibido)"))
+                    }
+                }
+            }
+            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+        onDispose {
+            recognizer.stopListening()
+            recognizer.destroy()
+        }
+    }
+
+    fun startListening() {
+        if (!hasPermission) { permLauncher.launch(Manifest.permission.RECORD_AUDIO); return }
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE,       Locale.getDefault())
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS,    3)
+        }
+        recognizer.startListening(intent)
+    }
+
+    fun stopListening() {
+        recognizer.stopListening()
+        micActive = false
     }
 
     Column(
@@ -109,7 +178,7 @@ fun VoiceScreen(
 
         AppleBottomNav(
             micActive   = micActive,
-            onMicToggle = { micActive = !micActive },
+            onMicToggle = { if (micActive) stopListening() else startListening() },
             onHome      = onBack,
             modifier    = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
