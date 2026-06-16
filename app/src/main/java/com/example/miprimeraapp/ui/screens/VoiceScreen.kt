@@ -140,12 +140,15 @@ fun VoiceScreen(
     ) {
         KigoAppleHeader()
 
-        // Upper zone: camera (left), background space (right)
-        Box(
+        // Upper zone: camera 16:9 portrait, width scales on tablet
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
         ) {
+            val isTablet    = maxWidth >= 600.dp
+            val cameraWidth = if (isTablet) maxWidth * 0.38f else 155.dp
+
             PortraitCameraBlock(
                 faceUIState   = faceUIState,
                 onSetupCamera = onSetupCamera,
@@ -156,34 +159,37 @@ fun VoiceScreen(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(start = 20.dp, top = 8.dp)
-                    .width(155.dp)
-                    .fillMaxHeight(0.92f)
+                    .width(cameraWidth)
+                    .aspectRatio(9f / 16f)
             )
         }
 
-        // Chat zone: mascot floats above card, glass card fills zone
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(330.dp)
-        ) {
-            GlassChatCard(
-                messages     = messages,
-                quickActions = listOf("Llamar a David", "Cancelar visita"),
-                modifier     = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 14.dp)
-            )
-
-            // Drawn after card → renders on top; negative Y offset floats into camera zone above
-            MascotImage(
+        // Chat zone: mascot floats above card, height adapts to tablet
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val chatHeight = if (maxWidth >= 600.dp) (maxHeight * 0.42f).coerceAtLeast(330.dp) else 330.dp
+            Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = 30.dp)
-                    .offset(y = (-185).dp)
-                    .size(215.dp)
-                    .zIndex(5f)
-            )
+                    .fillMaxWidth()
+                    .height(chatHeight)
+            ) {
+                GlassChatCard(
+                    messages     = messages,
+                    quickActions = listOf("Llamar a David", "Cancelar visita"),
+                    modifier     = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 14.dp)
+                )
+
+                // Drawn after card → renders on top; negative Y offset floats into camera zone above
+                MascotImage(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(end = 30.dp)
+                        .offset(y = (-185).dp)
+                        .size(215.dp)
+                        .zIndex(5f)
+                )
+            }
         }
 
         AppleBottomNav(
