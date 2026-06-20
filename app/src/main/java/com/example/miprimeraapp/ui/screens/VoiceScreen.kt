@@ -415,7 +415,6 @@ private fun AppleBottomNav(
         Box(
             modifier = Modifier
                 .size(64.dp)
-                .offset(y = (-10).dp)
                 .shadow(
                     elevation    = if (micActive) 16.dp else 4.dp,
                     shape        = CircleShape,
