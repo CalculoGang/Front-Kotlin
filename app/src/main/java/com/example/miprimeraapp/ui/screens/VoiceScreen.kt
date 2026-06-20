@@ -42,8 +42,11 @@ import com.example.miprimeraapp.R
 import com.example.miprimeraapp.model.FaceUIState
 import com.example.miprimeraapp.ui.components.*
 import com.example.miprimeraapp.ui.theme.KigoColors
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import com.example.miprimeraapp.flow.ConversationStep
+import com.example.miprimeraapp.flow.DialogEngine
+import com.example.miprimeraapp.flow.EngineResult
+import com.example.miprimeraapp.flow.VoiceFlowData
+import com.example.miprimeraapp.voice.VoiceAssistant
 import java.util.Locale
 
 @Composable
@@ -53,11 +56,14 @@ fun VoiceScreen(
     onSetupCamera : (PreviewView) -> Unit,
     onBack        : () -> Unit
 ) {
-    val context        = LocalContext.current
-    val scope          = rememberCoroutineScope()
-    var micActive      by remember { mutableStateOf(false) }
-    var mostrarDialogo by remember { mutableStateOf(false) }
-    var nombreInput    by remember { mutableStateOf("") }
+    val context            = LocalContext.current
+    var micActive          by remember { mutableStateOf(false) }
+    var kigoHablando       by remember { mutableStateOf(false) }
+    var asistente          by remember { mutableStateOf<VoiceAssistant?>(null) }
+    var estadoConversacion by remember { mutableStateOf(ConversationStep.MOTIVO) }
+    var datosCapturados    by remember { mutableStateOf(VoiceFlowData()) }
+    var mostrarDialogo     by remember { mutableStateOf(false) }
+    var nombreInput        by remember { mutableStateOf("") }
     var hasPermission  by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
@@ -67,7 +73,8 @@ fun VoiceScreen(
 
     val messages = remember {
         mutableStateListOf<ChatMessage>(
-            ChatMessage.Kigo("Hola! Cual es el motivo de su visita hoy?")
+            // Texto tomado del catálogo: pantalla y audio nunca pueden desincronizarse
+            ChatMessage.Kigo(VoiceAssistant.CATALOGO[7] ?: "")
         )
     }
 
@@ -76,6 +83,23 @@ fun VoiceScreen(
     ) { granted -> hasPermission = granted }
 
     val recognizer = remember { SpeechRecognizer.createSpeechRecognizer(context) }
+
+    // Defined before the DisposableEffect blocks so that onReady / onFinish can reference them
+    fun startListening() {
+        if (!hasPermission) { permLauncher.launch(Manifest.permission.RECORD_AUDIO); return }
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE,       Locale.getDefault())
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS,    3)
+        }
+        recognizer.startListening(intent)
+    }
+
+    fun stopListening() {
+        recognizer.stopListening()
+        micActive = false
+    }
 
     DisposableEffect(Unit) {
         recognizer.setRecognitionListener(object : RecognitionListener {
@@ -92,15 +116,32 @@ fun VoiceScreen(
                 micActive = false
                 messages.removeAll { it is ChatMessage.UserPartial }
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                if (!matches.isNullOrEmpty()) {
-                    messages.add(ChatMessage.User(matches[0]))
-                    messages.add(ChatMessage.Typing)
-                    scope.launch {
-                        delay(1500L)
-                        messages.remove(ChatMessage.Typing)
-                        messages.add(ChatMessage.Kigo("(audio recibido)"))
-                    }
+                if (matches.isNullOrEmpty()) return
+
+                val texto = matches[0]
+                messages.add(ChatMessage.User(texto))
+                messages.add(ChatMessage.Typing)
+
+                val resultado = DialogEngine.procesarRespuesta(estadoConversacion, datosCapturados, texto)
+                datosCapturados    = resultado.datos
+                estadoConversacion = resultado.siguienteEstado
+
+                messages.remove(ChatMessage.Typing)
+
+                if (resultado is EngineResult.AnfitrionEncontrado) {
+                    messages.add(ChatMessage.ResidentFound(
+                        name    = resultado.residente.nombre,
+                        address = resultado.residente.direccion
+                    ))
                 }
+                messages.add(ChatMessage.Kigo(VoiceAssistant.CATALOGO[resultado.numeroMensaje] ?: ""))
+
+                stopListening()
+                kigoHablando = true
+                asistente?.reproducirMensaje(resultado.numeroMensaje, onFinish = {
+                    kigoHablando = false
+                    if (estadoConversacion != ConversationStep.COMPLETADO) startListening()
+                })
             }
             override fun onPartialResults(partialResults: Bundle?) {
                 val partial = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
@@ -117,20 +158,22 @@ fun VoiceScreen(
         }
     }
 
-    fun startListening() {
-        if (!hasPermission) { permLauncher.launch(Manifest.permission.RECORD_AUDIO); return }
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE,       Locale.getDefault())
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS,    3)
-        }
-        recognizer.startListening(intent)
-    }
-
-    fun stopListening() {
-        recognizer.stopListening()
-        micActive = false
+    DisposableEffect(Unit) {
+        // var + nullable ref avoids a chicken-and-egg capture problem: onReady fires
+        // asynchronously (after TTS init), so `va` is guaranteed to be assigned by then.
+        var va: VoiceAssistant? = null
+        va = VoiceAssistant(context, onReady = {
+            // Kigo opens the conversation — mic must be silent while Kigo speaks
+            stopListening()
+            kigoHablando = true
+            va?.reproducirMensaje(7, onFinish = {
+                // Kigo finished speaking naturally → reactivate mic automatically
+                kigoHablando = false
+                startListening()
+            })
+        })
+        asistente = va
+        onDispose { va?.shutdown() }
     }
 
     Column(
@@ -188,7 +231,19 @@ fun VoiceScreen(
 
         AppleBottomNav(
             micActive   = micActive,
-            onMicToggle = { if (micActive) stopListening() else startListening() },
+            onMicToggle = {
+                if (micActive) {
+                    stopListening()
+                } else {
+                    // If Kigo is currently speaking, stop audio before activating mic —
+                    // both cannot run simultaneously or the mic captures Kigo's own voice
+                    if (kigoHablando) {
+                        kigoHablando = false   // clear flag before detener() discards callbacks
+                        asistente?.detener()
+                    }
+                    startListening()
+                }
+            },
             onHome      = onBack,
             modifier    = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
