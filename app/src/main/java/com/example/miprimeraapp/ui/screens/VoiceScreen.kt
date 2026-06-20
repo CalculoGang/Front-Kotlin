@@ -133,77 +133,144 @@ fun VoiceScreen(
         micActive = false
     }
 
-    Column(
+    val onRegisterTap: () -> Unit = {
+        nombreInput    = faceUIState.nombreReconocido ?: ""
+        mostrarDialogo = true
+    }
+
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(KigoColors.AppBg)
     ) {
-        KigoAppleHeader()
+        val isLandscape = maxWidth > maxHeight
 
-        // Upper zone: camera 16:9 portrait, width scales on tablet
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-        ) {
-            val isTablet    = maxWidth >= 600.dp
-            val cameraWidth = if (isTablet) maxWidth * 0.38f else 155.dp
+        if (isLandscape) {
+            // ── Landscape: camera left, narrow chat right, mascot above chat ──
+            Column(modifier = Modifier.fillMaxSize()) {
+                KigoAppleHeader()
 
-            PortraitCameraBlock(
-                faceUIState   = faceUIState,
-                onSetupCamera = onSetupCamera,
-                onRegisterTap = {
-                    nombreInput    = faceUIState.nombreReconocido ?: ""
-                    mostrarDialogo = true
-                },
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = 20.dp, top = 8.dp)
-                    .width(cameraWidth)
-                    .aspectRatio(9f / 16f)
-            )
-        }
-
-        // Chat zone: mascot floats above card, height adapts to tablet
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val isTablet    = maxWidth >= 600.dp
-            val chatHeight  = if (isTablet) (maxHeight * 0.42f).coerceAtLeast(330.dp) else 330.dp
-            // mascot capped just below camera width so it never dominates
-            val cameraWidth = if (isTablet) maxWidth * 0.38f else 155.dp
-            val mascotSize  = if (isTablet) cameraWidth * 1.05f else 215.dp
-            val mascotOffY  = -(mascotSize * 0.86f)
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(chatHeight)
-            ) {
-                GlassChatCard(
-                    messages     = messages,
-                    quickActions = listOf("Llamar a David", "Cancelar visita"),
-                    modifier     = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 14.dp)
-                )
-
-                // Drawn after card → renders on top; negative Y offset floats into camera zone above
-                MascotImage(
+                Row(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(end = 30.dp)
-                        .offset(y = mascotOffY)
-                        .size(mascotSize)
-                        .zIndex(5f)
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    // Camera (left) — natural 9:16 width driven by height, no extra space
+                    PortraitCameraBlock(
+                        faceUIState   = faceUIState,
+                        onSetupCamera = onSetupCamera,
+                        onRegisterTap = onRegisterTap,
+                        modifier = Modifier
+                            .padding(start = 20.dp, top = 8.dp, bottom = 8.dp)
+                            .fillMaxHeight()
+                            .aspectRatio(9f / 16f)
+                    )
+
+                    // Gap so the chat never reaches the camera window
+                    Spacer(modifier = Modifier.width(24.dp))
+
+                    // Chat (right) — takes all remaining width; mascot rests on its top edge
+                    val mascotSize = 165.dp
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    ) {
+                        GlassChatCard(
+                            messages     = messages,
+                            quickActions = listOf("Llamar a David", "Cancelar visita"),
+                            modifier     = Modifier
+                                .fillMaxSize()
+                                .padding(end = 20.dp, top = mascotSize * 0.52f, bottom = 8.dp)
+                        )
+
+                        // Sits on the card's top edge, lower half tucked behind it
+                        MascotImage(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(end = 40.dp)
+                                .offset(y = -(mascotSize * 0.38f))
+                                .size(mascotSize)
+                                .zIndex(5f)
+                        )
+                    }
+                }
+
+                AppleBottomNav(
+                    micActive   = micActive,
+                    onMicToggle = { if (micActive) stopListening() else startListening() },
+                    onHome      = onBack,
+                    modifier    = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+        } else {
+            // ── Portrait: stacked camera over chat, mascot floats above card ──
+            Column(modifier = Modifier.fillMaxSize()) {
+                KigoAppleHeader()
+
+                // Upper zone: camera 16:9 portrait, width scales on tablet
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    val isTablet    = maxWidth >= 600.dp
+                    val cameraWidth = if (isTablet) maxWidth * 0.38f else 155.dp
+
+                    PortraitCameraBlock(
+                        faceUIState   = faceUIState,
+                        onSetupCamera = onSetupCamera,
+                        onRegisterTap = onRegisterTap,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(start = 20.dp, top = 8.dp)
+                            .width(cameraWidth)
+                            .aspectRatio(9f / 16f)
+                    )
+                }
+
+                // Chat zone: mascot floats above card, height adapts to tablet
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val isTablet    = maxWidth >= 600.dp
+                    val chatHeight  = if (isTablet) (maxHeight * 0.42f).coerceAtLeast(330.dp) else 330.dp
+                    // mascot capped just below camera width so it never dominates
+                    val cameraWidth = if (isTablet) maxWidth * 0.38f else 155.dp
+                    val mascotSize  = if (isTablet) cameraWidth * 1.05f else 215.dp
+                    val mascotOffY  = -(mascotSize * 0.86f)
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(chatHeight)
+                    ) {
+                        GlassChatCard(
+                            messages     = messages,
+                            quickActions = listOf("Llamar a David", "Cancelar visita"),
+                            modifier     = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 14.dp)
+                        )
+
+                        // Drawn after card → renders on top; negative Y offset floats into camera zone above
+                        MascotImage(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(end = 30.dp)
+                                .offset(y = mascotOffY)
+                                .size(mascotSize)
+                                .zIndex(5f)
+                        )
+                    }
+                }
+
+                AppleBottomNav(
+                    micActive   = micActive,
+                    onMicToggle = { if (micActive) stopListening() else startListening() },
+                    onHome      = onBack,
+                    modifier    = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
         }
-
-        AppleBottomNav(
-            micActive   = micActive,
-            onMicToggle = { if (micActive) stopListening() else startListening() },
-            onHome      = onBack,
-            modifier    = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
     }
 
     if (mostrarDialogo) {
