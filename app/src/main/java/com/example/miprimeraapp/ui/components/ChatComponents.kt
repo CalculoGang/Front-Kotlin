@@ -81,7 +81,7 @@ fun ConversationList(
 fun KigoSenderLabel() {
     Text(
         text = "KIGO",
-        fontSize = 9.sp,
+        fontSize = 11.sp,
         fontWeight = FontWeight.SemiBold,
         color = KigoColors.Pending,
         letterSpacing = 1.8.sp,
@@ -101,7 +101,7 @@ fun KigoBubble(text: String) {
                 .background(Color(0xFFEEEEF4), shape)
                 .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
-            Text(text = text, fontSize = 14.sp, lineHeight = 20.sp, color = Color(0xFF1C1C1E))
+            Text(text = text, fontSize = 16.sp, lineHeight = 22.sp, color = Color(0xFF1C1C1E))
         }
     }
 }
@@ -121,7 +121,7 @@ fun UserBubble(text: String) {
                 .background(KigoColors.KigoRed, shape)
                 .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
-            Text(text = text, fontSize = 14.sp, lineHeight = 20.sp, color = Color.White)
+            Text(text = text, fontSize = 16.sp, lineHeight = 22.sp, color = Color.White)
         }
     }
 }
@@ -269,7 +269,7 @@ fun QuickActionChip(label: String, onClick: () -> Unit) {
     ) {
         Text(
             text = label,
-            fontSize = 13.sp,
+            fontSize = 15.sp,
             fontWeight = FontWeight.Medium,
             color = Color(0xFF4B5563)
         )

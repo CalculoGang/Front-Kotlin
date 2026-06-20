@@ -1,4 +1,4 @@
-package com.example.miprimeraapp.ui.screens
+    package com.example.miprimeraapp.ui.screens
 
 import android.Manifest
 import android.content.Intent
@@ -166,7 +166,13 @@ fun VoiceScreen(
 
         // Chat zone: mascot floats above card, height adapts to tablet
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val chatHeight = if (maxWidth >= 600.dp) (maxHeight * 0.42f).coerceAtLeast(330.dp) else 330.dp
+            val isTablet    = maxWidth >= 600.dp
+            val chatHeight  = if (isTablet) (maxHeight * 0.42f).coerceAtLeast(330.dp) else 330.dp
+            // mascot capped just below camera width so it never dominates
+            val cameraWidth = if (isTablet) maxWidth * 0.38f else 155.dp
+            val mascotSize  = if (isTablet) cameraWidth * 1.05f else 215.dp
+            val mascotOffY  = -(mascotSize * 0.86f)
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -185,8 +191,8 @@ fun VoiceScreen(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(end = 30.dp)
-                        .offset(y = (-185).dp)
-                        .size(215.dp)
+                        .offset(y = mascotOffY)
+                        .size(mascotSize)
                         .zIndex(5f)
                 )
             }
