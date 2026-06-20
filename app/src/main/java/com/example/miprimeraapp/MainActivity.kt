@@ -15,7 +15,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.miprimeraapp.model.AppScreen
+import com.example.miprimeraapp.model.Empresa
 import com.example.miprimeraapp.model.FaceUIState
+import com.example.miprimeraapp.model.Persona
 import com.example.miprimeraapp.model.TouchFormData
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
@@ -30,6 +32,8 @@ class MainActivity : ComponentActivity() {
     private val faceUIState    = mutableStateOf(FaceUIState())
     private val currentScreen  = mutableStateOf(AppScreen.WELCOME)
     private val touchFormData  = mutableStateOf(TouchFormData())
+    private val personas       = mutableStateOf<List<Persona>>(emptyList())
+    private val empresas       = mutableStateOf<List<Empresa>>(emptyList())
 
     private val cameraExecutor = Executors.newSingleThreadExecutor()
     private var faceDetector: FaceDetector? = null
@@ -42,6 +46,9 @@ class MainActivity : ComponentActivity() {
         FaceStorage.cargar(this).forEach { (nombre, vectores) ->
             personasDB[nombre] = vectores
         }
+
+        personas.value = AdminStorage.cargarPersonas(this)
+        empresas.value = AdminStorage.cargarEmpresas(this)
 
         try {
             faceEmbedder = FaceEmbedder(this)
@@ -61,15 +68,31 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             KigoApp(
-                currentScreen = currentScreen.value,
-                onNavigate    = { currentScreen.value = it },
-                faceUIState   = faceUIState.value,
-                touchFormData = touchFormData.value,
-                onFormUpdate  = { touchFormData.value = it },
-                onGuardarFace = ::savePerson,
-                onSetupCamera = ::setupCamera
+                currentScreen  = currentScreen.value,
+                onNavigate     = { currentScreen.value = it },
+                faceUIState    = faceUIState.value,
+                touchFormData  = touchFormData.value,
+                onFormUpdate   = { touchFormData.value = it },
+                onGuardarFace  = ::savePerson,
+                onSetupCamera  = ::setupCamera,
+                personas       = personas.value,
+                empresas       = empresas.value,
+                onAddPersona   = ::addPersona,
+                onAddEmpresa   = ::addEmpresa
             )
         }
+    }
+
+    private fun addPersona(persona: Persona) {
+        if (persona.nombre.isBlank()) return
+        personas.value = personas.value + persona
+        AdminStorage.guardar(this, personas.value, empresas.value)
+    }
+
+    private fun addEmpresa(empresa: Empresa) {
+        if (empresa.nombre.isBlank()) return
+        empresas.value = empresas.value + empresa
+        AdminStorage.guardar(this, personas.value, empresas.value)
     }
 
     private fun savePerson(nombre: String, vector: List<Float>) {
