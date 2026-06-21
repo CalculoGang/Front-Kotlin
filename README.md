@@ -60,20 +60,59 @@ Welcome → Mode Select → Touch Form (4 pasos) → Success
 | **Mode Select** | El usuario elige Táctil o Voz. Voz solicita permiso de micrófono aquí |
 | **Touch Form** | Formulario de 4 pasos: datos personales → visita → ID → confirmación |
 | **Voice** | Cámara frontal + reconocimiento facial + conversación por voz en tiempo real (SpeechRecognizer) |
+| **Admin** | (desde Welcome ⚙) Alta de personas/empresas contra el backend + captura biométrica multi-muestra |
 | **Success** | Ticket de acceso con código QR (placeholder) |
 
 ---
+
+## Arquitectura (MVVM)
+
+La app sigue **MVVM** con un único ViewModel y una capa de datos. La Activity es un cascarón:
+recoge el estado del ViewModel y lo pasa a Compose; no contiene lógica de negocio. DI es una
+`ViewModelProvider.Factory` manual — **sin Hilt** (un solo ViewModel no lo necesita).
+
+```
+        ┌─────────────┐  state (StateFlow)   ┌──────────────────┐
+        │  Compose UI │ ◀─────────────────── │   KigoViewModel  │
+        │  (screens)  │ ───────────────────▶ │  uiState/faceState│
+        └─────────────┘  eventos (lambdas)   └────────┬─────────┘
+                                                       │ suspend
+        ┌─────────────┐  (hayRostro, vector) ┌─────────▼─────────┐
+        │ FacePipeline│ ───────────────────▶ │   KigoRepository  │
+        │ cámara+ML+emb│                      │ KigoApi + cache   │
+        └─────────────┘                      └────────┬──────────┘
+                                              ┌────────▼──────────┐
+                                              │ Backend Go / JSON │
+                                              └───────────────────┘
+```
+
+- **`KigoViewModel`** es dueño del estado en dos `StateFlow`: `uiState` (pantalla, formulario,
+  listas de personas/empresas) y `faceState` (se actualiza por-frame, va aparte para no
+  recomponer las listas en cada frame). Toda la lógica + red corre en `viewModelScope`.
+- **`KigoRepository`** aísla los datos: funciones `suspend` en `Dispatchers.IO` que envuelven
+  `KigoApi` (red) y `AdminStorage` (cache local). El ViewModel nunca toca disco ni red directamente.
+- **`FacePipeline`** hace cámara + ML Kit + embedding y emite `(hayRostro, vector)` al ViewModel,
+  que decide el lookup biométrico contra el backend (con throttle).
 
 ## Estructura del proyecto
 
 ```
 app/src/main/java/com/example/miprimeraapp/
 │
-├── MainActivity.kt              # Activity: lifecycle, cámara, permisos, face recognition
+├── MainActivity.kt              # Cascarón: cablea KigoViewModel + FacePipeline + Compose
 ├── KigoApp.kt                   # Navegación root — decide qué pantalla mostrar
 │
+├── vm/
+│   └── KigoViewModel.kt         # ViewModel único: uiState + faceState (StateFlow), acciones
+│
+├── data/
+│   └── KigoRepository.kt        # Capa de datos: KigoApi + AdminStorage, suspend/Dispatchers.IO
+│
+├── face/
+│   └── FacePipeline.kt          # Cámara + ML Kit + embedding; emite (hayRostro, vector) al VM
+│
 ├── model/
-│   └── Models.kt                # AppScreen (enum), TouchFormData, FaceUIState
+│   └── Models.kt                # AppScreen (enum), TouchFormData, FaceUIState, Persona, Empresa
 │
 ├── ui/
 │   ├── theme/
@@ -95,12 +134,14 @@ app/src/main/java/com/example/miprimeraapp/
 │       ├── TouchFormScreen.kt   # Steps: Step1Personal, Step2Visit, Step3Id, Step4Confirm
 │       ├── VoiceScreen.kt       # Cámara + SpeechRecognizer + chat en vivo (ver docs/)
 │       ├── SpeechTestScreen.kt  # Pantalla de prueba STT independiente
+│       ├── AdminScreen.kt       # Alta de personas/empresas + captura biométrica multi-muestra
 │       └── SuccessScreen.kt     # TicketCard con QR placeholder
 │
-├── FaceEmbedder.kt              # Carga modelo .tflite, genera embedding 128-dim
-├── FaceRecognitionEngine.kt     # Distancia coseno, umbral de reconocimiento
-├── FaceStorage.kt               # Persistencia de vectores en faces.json (filesDir)
-└── ImageUtils.kt                # Rotate, toBitmap, cropFace
+├── KigoApi.kt                   # Cliente HTTP del backend Go (org.json, bloqueante)
+├── AdminStorage.kt              # Cache local en admin.json (filesDir)
+├── FaceEmbedder.kt              # Carga modelo .tflite, genera embedding (L2-normalizado)
+├── FaceRecognitionEngine.kt     # Distancia coseno, promedio de embeddings
+└── ImageUtils.kt                # toBitmap (YUV→RGB), rotate, alignFace
 ```
 
 ---
@@ -172,19 +213,43 @@ object KigoColors {
 
 ## Reconocimiento facial
 
-La lógica vive en `MainActivity.kt` (orquestación) y los archivos `Face*.kt` (algoritmos). El resultado se expone como `FaceUIState` y se pasa a `VoiceScreen` vía composición — sin dependencia directa entre la UI y el motor.
+El pipeline vive en `face/FacePipeline.kt` (cámara + detección + embedding). Emite
+`(hayRostro, vector)` al `KigoViewModel`, que consulta el backend (`POST /personas/buscar-rostro`)
+con throttle y publica el resultado en `faceState`. La UI (`VoiceScreen`, `AdminScreen`) solo
+lee `FaceUIState` por composición — sin dependencia directa entre UI y motor.
 
 | Archivo | Responsabilidad |
 |---|---|
-| `FaceEmbedder.kt` | Carga `mobile_face_net.tflite`, devuelve vector `float[128]` |
-| `FaceRecognitionEngine.kt` | Compara vectores con distancia coseno. Umbral: `THRESHOLD = 0.20f` |
-| `FaceStorage.kt` | Lee/escribe `faces.json` en `filesDir` (sin permisos extra) |
-| `ImageUtils.kt` | Preprocesado: rotar bitmap, recortar cara del bounding box |
+| `face/FacePipeline.kt` | Cámara CameraX + ML Kit (cara más grande) + gates de calidad + promedio de N frames |
+| `FaceEmbedder.kt` | Carga `mobilefacenet.tflite`, devuelve embedding L2-normalizado (dim leída del modelo) |
+| `FaceRecognitionEngine.kt` | Distancia coseno + `promediar()` de embeddings |
+| `ImageUtils.kt` | Preprocesado: `toBitmap` (YUV→RGB), `rotate`, `alignFace` (nivela por roll + margen) |
 
-Para ajustar la sensibilidad del reconocimiento editar `FaceRecognitionEngine.kt`:
+El **match** se hace en el backend (vector de 128 dims). El front solo extrae y promedia el
+embedding. Para ajustar qué caras se embeben (calidad), editar las constantes en
+`FacePipeline.kt`:
 ```kotlin
-private const val THRESHOLD = 0.20f  // menor = más estricto
+private const val FACE_MIN_PX      = 100   // lado mínimo del box; súbelo si el kiosko está lejos
+private const val FACE_MAX_YAW_DEG = 18f   // perfil máximo permitido
+private const val FACE_AVG_FRAMES  = 5     // frames buenos a promediar por emisión
 ```
+El intervalo entre lookups al backend está en `KigoViewModel`: `FACE_QUERY_MS = 1200L`.
+
+---
+
+## Cómo agregar lógica de negocio (MVVM)
+
+Estado y red **no** van en la Activity ni en las pantallas — van en el ViewModel y el repositorio.
+
+1. **Dato nuevo de red** → añadir una función `suspend` en `data/KigoRepository.kt` que envuelva
+   la llamada de `KigoApi` dentro de `withContext(Dispatchers.IO)`.
+2. **Acción/estado nuevo** → en `vm/KigoViewModel.kt`: añadir el campo al `KigoUiState`
+   (o al `FaceUIState`) y una función que lance `viewModelScope.launch { ... }` llamando al repo
+   y actualizando el `StateFlow` con `_uiState.update { ... }`.
+3. **Exponerlo a la UI** → pasar el valor/estado y la lambda desde `MainActivity` →
+   `KigoApp` → la pantalla. Las pantallas siguen recibiendo estado + callbacks (nunca el VM directo).
+4. **Mensajes al usuario** → emitir por el `SharedFlow` de toasts del VM (`toast("...")`);
+   la Activity los muestra. El VM no toca UI.
 
 ---
 
@@ -215,6 +280,12 @@ Flujo resumido:
 // Jetpack Compose
 "androidx.activity:activity-compose"
 "androidx.compose.material3:material3"
+
+// MVVM: ViewModel + coroutines + colección lifecycle-aware en Compose
+"androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7"
+"androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7"
+"androidx.lifecycle:lifecycle-runtime-compose:2.8.7"
+"org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1"
 
 // CameraX
 "androidx.camera:camera-core:1.4.2"

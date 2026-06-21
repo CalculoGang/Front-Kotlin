@@ -75,8 +75,25 @@ object KigoApi {
         } catch (e: Exception) {
             // 404 = sin coincidencia (backend devuelve reconocido:false); red caida = transitorio.
             // En ambos casos: tratar como desconocido. ponytail: sin distinguir, es un poll por-frame.
+            // ponytail: log temporal para diagnostico; quitar cuando red/umbral esten afinados.
+            android.util.Log.w("KigoApi", "buscarPorRostro: ${e.message}")
             null
         }
+    }
+
+    /**
+     * Añade una muestra facial extra a una persona existente (galeria 1→N).
+     * POST /personas/{id}/biometrico. Bloquea; llamar en hilo de fondo.
+     */
+    fun agregarMuestra(personaId: String, vector: List<Float>) {
+        if (vector.size != 128) {
+            android.util.Log.w("KigoApi", "agregarMuestra size=${vector.size}; backend exige 128")
+            return
+        }
+        val body = JSONObject()
+            .put("vector_facial", JSONArray(vector))
+            .put("version_modelo", VERSION_MODELO)
+        post("/personas/$personaId/biometrico", body)
     }
 
     // ─── mapeo JSON → modelo ──────────────────────────────────────────────────

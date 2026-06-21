@@ -2,8 +2,11 @@ package com.example.miprimeraapp
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.ImageFormat
 import android.graphics.Matrix
+import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.YuvImage
 import androidx.camera.core.ImageProxy
@@ -39,15 +42,45 @@ object ImageUtils {
         return Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
     }
 
-    /** Crop to the face bounding box, clamped to the bitmap bounds. */
-    fun cropFace(bmp: Bitmap, box: Rect): Bitmap? {
-        val left = box.left.coerceIn(0, bmp.width - 1)
-        val top = box.top.coerceIn(0, bmp.height - 1)
-        val right = box.right.coerceIn(left + 1, bmp.width)
-        val bottom = box.bottom.coerceIn(top + 1, bmp.height)
-        val w = right - left
-        val h = bottom - top
-        if (w <= 0 || h <= 0) return null
-        return Bitmap.createBitmap(bmp, left, top, w, h)
+    /**
+     * Aligned face crop for the embedder: levels the eyes (rolls by [rollDeg]),
+     * centers on the face box, and adds [margin] padding — MobileFaceNet was
+     * trained on aligned crops with margin, so a raw tight box embeds poorly.
+     *
+     * Output is a square [outSize] bitmap drawn in one Matrix pass (rotate +
+     * scale + center), so the embedder's later resize is a no-op when
+     * outSize == model inputSize.
+     *
+     * @param rollDeg face roll in degrees (ML Kit `headEulerAngleZ`).
+     */
+    fun alignFace(
+        bmp: Bitmap,
+        box: Rect,
+        rollDeg: Float,
+        outSize: Int,
+        margin: Float = 0.25f,
+    ): Bitmap? {
+        val side = alignSide(box.width(), box.height(), margin)
+        if (side < 1f || outSize < 1) return null
+        val cx = box.exactCenterX()
+        val cy = box.exactCenterY()
+        val scale = outSize / side
+
+        val out = Bitmap.createBitmap(outSize, outSize, Bitmap.Config.ARGB_8888)
+        val m = Matrix().apply {
+            postTranslate(-cx, -cy)           // face center -> origin
+            postRotate(-rollDeg)              // ponytail: level eyes; flip sign if faces come out tilted the wrong way
+            postScale(scale, scale)           // box side -> outSize
+            postTranslate(outSize / 2f, outSize / 2f)
+        }
+        Canvas(out).apply {
+            drawColor(Color.BLACK)            // pad out-of-bounds with black, not garbage
+            drawBitmap(bmp, m, Paint(Paint.FILTER_BITMAP_FLAG))
+        }
+        return out
     }
+
+    /** Square crop side: the longer box edge plus [margin] padding on each side. */
+    internal fun alignSide(boxW: Int, boxH: Int, margin: Float): Float =
+        maxOf(boxW, boxH) * (1f + 2f * margin)
 }

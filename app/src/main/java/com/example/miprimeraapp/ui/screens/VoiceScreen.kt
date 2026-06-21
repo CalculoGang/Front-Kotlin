@@ -51,10 +51,11 @@ import java.util.Locale
 
 @Composable
 fun VoiceScreen(
-    faceUIState   : FaceUIState,
-    onGuardarFace : (String, List<Float>) -> Unit,
-    onSetupCamera : (PreviewView) -> Unit,
-    onBack        : () -> Unit
+    faceUIState      : FaceUIState,
+    onGuardarFace    : (String, List<Float>) -> Unit,
+    onAgregarMuestra : () -> Unit,
+    onSetupCamera    : (PreviewView) -> Unit,
+    onBack           : () -> Unit
 ) {
     val context            = LocalContext.current
     var micActive          by remember { mutableStateOf(false) }
@@ -215,9 +216,10 @@ fun VoiceScreen(
                 ) {
                     // Camera (left) — natural 9:16 width driven by height, no extra space
                     PortraitCameraBlock(
-                        faceUIState   = faceUIState,
-                        onSetupCamera = onSetupCamera,
-                        onRegisterTap = onRegisterTap,
+                        faceUIState    = faceUIState,
+                        onSetupCamera  = onSetupCamera,
+                        onRegisterTap  = onRegisterTap,
+                        onAddSampleTap = onAgregarMuestra,
                         modifier = Modifier
                             .padding(start = 20.dp, top = 8.dp, bottom = 8.dp)
                             .fillMaxHeight()
@@ -276,9 +278,10 @@ fun VoiceScreen(
                     val cameraWidth = if (isTablet) maxWidth * 0.38f else 155.dp
 
                     PortraitCameraBlock(
-                        faceUIState   = faceUIState,
-                        onSetupCamera = onSetupCamera,
-                        onRegisterTap = onRegisterTap,
+                        faceUIState    = faceUIState,
+                        onSetupCamera  = onSetupCamera,
+                        onRegisterTap  = onRegisterTap,
+                        onAddSampleTap = onAgregarMuestra,
                         modifier = Modifier
                             .align(Alignment.TopStart)
                             .padding(start = 20.dp, top = 8.dp)
@@ -390,10 +393,11 @@ private fun KigoAppleHeader() {
 
 @Composable
 private fun PortraitCameraBlock(
-    faceUIState   : FaceUIState,
-    onSetupCamera : (PreviewView) -> Unit,
-    onRegisterTap : () -> Unit,
-    modifier      : Modifier = Modifier
+    faceUIState    : FaceUIState,
+    onSetupCamera  : (PreviewView) -> Unit,
+    onRegisterTap  : () -> Unit,
+    onAddSampleTap : () -> Unit,
+    modifier       : Modifier = Modifier
 ) {
     val recTransition = rememberInfiniteTransition(label = "rec")
     val recAlpha by recTransition.animateFloat(
@@ -422,16 +426,31 @@ private fun PortraitCameraBlock(
         }
 
         if (faceUIState.hayRostro) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(8.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(chipColor)
-                    .clickable(onClick = onRegisterTap)
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            Column(
+                modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(chipText, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(chipColor)
+                        .clickable(onClick = onRegisterTap)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(chipText, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+                // Solo tras reconocer: añade el rostro actual como muestra extra (galeria 1→N).
+                if (faceUIState.nombreReconocido != null) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.Black.copy(alpha = 0.6f))
+                            .clickable(onClick = onAddSampleTap)
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text("+ muestra", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
 

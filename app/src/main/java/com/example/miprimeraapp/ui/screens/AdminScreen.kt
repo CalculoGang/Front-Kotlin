@@ -42,7 +42,7 @@ fun AdminScreen(
     empresas      : List<Empresa>,
     faceUIState   : FaceUIState,
     onSetupCamera : (PreviewView) -> Unit,
-    onAddPersona  : (Persona, List<Float>) -> Unit,
+    onAddPersona  : (Persona, List<List<Float>>) -> Unit,
     onAddEmpresa  : (Empresa) -> Unit,
     onBack        : () -> Unit
 ) {
@@ -108,7 +108,7 @@ private fun PersonaSection(
     empresas      : List<Empresa>,
     faceUIState   : FaceUIState,
     onSetupCamera : (PreviewView) -> Unit,
-    onAdd         : (Persona, List<Float>) -> Unit
+    onAdd         : (Persona, List<List<Float>>) -> Unit
 ) {
     var nombre         by remember { mutableStateOf("") }
     var tipo           by remember { mutableStateOf("visitante") }
@@ -117,7 +117,7 @@ private fun PersonaSection(
     var tipoId         by remember { mutableStateOf("") }
     var telefono       by remember { mutableStateOf("") }
     var correo         by remember { mutableStateOf("") }
-    var vectorFacial   by remember { mutableStateOf<List<Float>>(emptyList()) }
+    var muestras       by remember { mutableStateOf<List<List<Float>>>(emptyList()) }
 
     val nombresEmpresas = empresas.map { it.nombre }
     val sinEmpresas     = nombresEmpresas.isEmpty()
@@ -141,15 +141,16 @@ private fun PersonaSection(
         KigoTextField("Teléfono", telefono, "10 dígitos") { telefono = it }
         KigoTextField("Correo", correo, "correo@ejemplo.com") { correo = it }
 
-        // Captura biométrica: vector facial 192D vía FaceEmbedder (MainActivity → faceUIState).
+        // Captura biométrica: 1→N muestras del vector facial vía FaceEmbedder (MainActivity → faceUIState).
         FaceCaptureBlock(
             faceUIState   = faceUIState,
             onSetupCamera = onSetupCamera,
-            capturedDims  = vectorFacial.size,
-            onCapture     = { if (faceUIState.vector.isNotEmpty()) vectorFacial = faceUIState.vector }
+            muestrasCount = muestras.size,
+            onCapture     = { if (faceUIState.vector.isNotEmpty()) muestras = muestras + listOf(faceUIState.vector) },
+            onLimpiar     = { muestras = emptyList() }
         )
 
-        SaveButton(enabled = nombre.isNotBlank() && empresa.isNotBlank() && vectorFacial.isNotEmpty()) {
+        SaveButton(enabled = nombre.isNotBlank() && empresa.isNotBlank() && muestras.isNotEmpty()) {
             onAdd(
                 Persona(
                     nombre             = nombre.trim(),
@@ -160,11 +161,11 @@ private fun PersonaSection(
                     telefono           = telefono.trim(),
                     correo             = correo.trim()
                 ),
-                vectorFacial
+                muestras
             )
             nombre = ""; tipo = "visitante"; empresa = ""
             empresaOrigen = ""; tipoId = ""; telefono = ""; correo = ""
-            vectorFacial = emptyList()
+            muestras = emptyList()
         }
     }
 
@@ -192,8 +193,9 @@ private fun PersonaSection(
 private fun FaceCaptureBlock(
     faceUIState   : FaceUIState,
     onSetupCamera : (PreviewView) -> Unit,
-    capturedDims  : Int,
-    onCapture     : () -> Unit
+    muestrasCount : Int,
+    onCapture     : () -> Unit,
+    onLimpiar     : () -> Unit
 ) {
     FormSectionTitle("📷", "Rostro (biométrico)", KigoColors.VoiceGreen)
     Box(
@@ -220,17 +222,37 @@ private fun FaceCaptureBlock(
             Text(chipText, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
     }
-    Button(
-        onClick  = onCapture,
-        enabled  = faceUIState.hayRostro && faceUIState.vector.isNotEmpty(),
-        modifier = Modifier.fillMaxWidth().height(44.dp),
-        shape    = RoundedCornerShape(12.dp),
-        colors   = ButtonDefaults.buttonColors(containerColor = KigoColors.VoiceGreen)
+    Text(
+        if (muestrasCount > 0) "Muestras capturadas: $muestrasCount" else "Captura varias muestras (frontal, perfil, distinta luz).",
+        fontSize = 12.sp,
+        color    = if (muestrasCount > 0) KigoColors.VoiceGreen else KigoColors.TextSecondary
+    )
+    Row(
+        modifier              = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
-            if (capturedDims > 0) "✓ Rostro capturado ($capturedDims D)" else "Capturar rostro",
-            color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp
-        )
+        Button(
+            onClick  = onCapture,
+            enabled  = faceUIState.hayRostro && faceUIState.vector.isNotEmpty(),
+            modifier = Modifier.weight(1f).height(44.dp),
+            shape    = RoundedCornerShape(12.dp),
+            colors   = ButtonDefaults.buttonColors(containerColor = KigoColors.VoiceGreen)
+        ) {
+            Text(
+                if (muestrasCount > 0) "+ Agregar muestra" else "Capturar rostro",
+                color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp
+            )
+        }
+        if (muestrasCount > 0) {
+            Button(
+                onClick  = onLimpiar,
+                modifier = Modifier.height(44.dp),
+                shape    = RoundedCornerShape(12.dp),
+                colors   = ButtonDefaults.buttonColors(containerColor = KigoColors.CardBg)
+            ) {
+                Text("Limpiar", color = KigoColors.TextSecondary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            }
+        }
     }
 }
 

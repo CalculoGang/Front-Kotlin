@@ -20,10 +20,11 @@ fun KigoApp(
     touchFormData : TouchFormData,
     onFormUpdate  : (TouchFormData) -> Unit,
     onGuardarFace : (String, List<Float>) -> Unit,
+    onAgregarMuestra : () -> Unit,
     onSetupCamera : (PreviewView) -> Unit,
     personas      : List<Persona>,
     empresas      : List<Empresa>,
-    onAddPersona  : (Persona, List<Float>) -> Unit,
+    onAddPersona  : (Persona, List<List<Float>>) -> Unit,
     onAddEmpresa  : (Empresa) -> Unit
 ) {
     when (currentScreen) {
@@ -44,10 +45,11 @@ fun KigoApp(
             onSubmit = { onNavigate(AppScreen.SUCCESS) }
         )
         AppScreen.VOICE       -> VoiceScreen(
-            faceUIState   = faceUIState,
-            onGuardarFace = onGuardarFace,
-            onSetupCamera = onSetupCamera,
-            onBack        = { onNavigate(AppScreen.MODE_SELECT) }
+            faceUIState      = faceUIState,
+            onGuardarFace    = onGuardarFace,
+            onAgregarMuestra = onAgregarMuestra,
+            onSetupCamera    = onSetupCamera,
+            onBack           = { onNavigate(AppScreen.MODE_SELECT) }
         )
         AppScreen.SUCCESS     -> SuccessScreen(
             formData = touchFormData,

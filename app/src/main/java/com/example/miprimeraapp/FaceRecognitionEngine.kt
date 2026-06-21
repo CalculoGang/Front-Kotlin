@@ -30,7 +30,7 @@ object FaceRecognitionEngine {
         var mejorDist = Float.MAX_VALUE
 
         for ((nombre, vectores) in personas) {
-            val centroid = centroide(vectores) ?: continue
+            val centroid = promediar(vectores) ?: continue
             val d = distancia(vector, centroid)
             if (d < mejorDist) {
                 mejorDist = d
@@ -41,8 +41,8 @@ object FaceRecognitionEngine {
         return Pair(if (mejorDist <= umbral) mejorNombre else null, mejorDist)
     }
 
-    /** Mean of the stored embeddings, re-normalized to unit length. */
-    private fun centroide(vectores: List<List<Float>>): List<Float>? {
+    /** Mean of the embeddings, re-normalized to unit length (null if empty). */
+    fun promediar(vectores: List<List<Float>>): List<Float>? {
         if (vectores.isEmpty()) return null
         val len = vectores[0].size
         val sumas = FloatArray(len)
