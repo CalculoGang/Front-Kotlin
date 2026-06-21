@@ -6,7 +6,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.example.miprimeraapp.model.AppScreen
+import com.example.miprimeraapp.model.Empresa
 import com.example.miprimeraapp.model.FaceUIState
+import com.example.miprimeraapp.model.Persona
 import com.example.miprimeraapp.model.TouchFormData
 import com.example.miprimeraapp.ui.screens.*
 
@@ -18,12 +20,17 @@ fun KigoApp(
     touchFormData : TouchFormData,
     onFormUpdate  : (TouchFormData) -> Unit,
     onGuardarFace : (String, List<Float>) -> Unit,
-    onSetupCamera : (PreviewView) -> Unit
+    onSetupCamera : (PreviewView) -> Unit,
+    personas      : List<Persona>,
+    empresas      : List<Empresa>,
+    onAddPersona  : (Persona) -> Unit,
+    onAddEmpresa  : (Empresa) -> Unit
 ) {
     when (currentScreen) {
         AppScreen.WELCOME     -> WelcomeScreen(
             onStart      = { onNavigate(AppScreen.MODE_SELECT) },
-            onTestSpeech = { onNavigate(AppScreen.SPEECH_TEST) }
+            onTestSpeech = { onNavigate(AppScreen.SPEECH_TEST) },
+            onAdmin      = { onNavigate(AppScreen.ADMIN) }
         )
         AppScreen.MODE_SELECT -> ModeSelectScreen(
             onBack        = { onNavigate(AppScreen.WELCOME) },
@@ -51,6 +58,13 @@ fun KigoApp(
         )
         AppScreen.SPEECH_TEST -> SpeechTestScreen(
             onBack = { onNavigate(AppScreen.WELCOME) }
+        )
+        AppScreen.ADMIN       -> AdminScreen(
+            personas     = personas,
+            empresas     = empresas,
+            onAddPersona = onAddPersona,
+            onAddEmpresa = onAddEmpresa,
+            onBack       = { onNavigate(AppScreen.WELCOME) }
         )
     }
 }

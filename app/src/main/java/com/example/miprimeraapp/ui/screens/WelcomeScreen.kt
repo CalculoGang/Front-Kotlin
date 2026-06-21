@@ -26,7 +26,7 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun WelcomeScreen(onStart: () -> Unit, onTestSpeech: () -> Unit = {}) {
+fun WelcomeScreen(onStart: () -> Unit, onTestSpeech: () -> Unit = {}, onAdmin: () -> Unit = {}) {
     var timeText by remember { mutableStateOf(currentTime()) }
     LaunchedEffect(Unit) {
         while (true) { delay(1000); timeText = currentTime() }
@@ -76,6 +76,14 @@ fun WelcomeScreen(onStart: () -> Unit, onTestSpeech: () -> Unit = {}) {
                     border   = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
                 ) {
                     Text("Tengo cita previa", color = Color.White.copy(alpha = 0.8f), fontSize = 15.sp)
+                }
+                OutlinedButton(
+                    onClick  = onAdmin,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape    = RoundedCornerShape(14.dp),
+                    border   = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
+                ) {
+                    Text("⚙ Administrador", color = Color.White.copy(alpha = 0.8f), fontSize = 15.sp)
                 }
             }
 
