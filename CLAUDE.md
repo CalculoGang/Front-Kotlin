@@ -11,7 +11,7 @@ Android kiosk app for visitor self-check-in. Residents are identified via fronta
 | UI | Jetpack Compose + Material3 |
 | Camera | CameraX 1.4.2 |
 | Face detection | ML Kit `face-detection:16.1.7` |
-| Face recognition | TFLite `mobile_face_net.tflite` (128-dim cosine) |
+| Face recognition | TFLite `mobilefacenet.tflite` (192-dim cosine, dim read from model output tensor) |
 | Speech-to-Text | Android native `SpeechRecognizer` |
 | Persistence | `faces.json` in `filesDir` via `FaceStorage.kt` |
 

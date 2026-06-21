@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap
 class VoiceAssistant(
     context: Context,
     private val onReady: () -> Unit = {}
-) : VoiceOutput, TextToSpeech.OnInitListener {
+) : TextToSpeech.OnInitListener {
 
     private var tts: TextToSpeech? = TextToSpeech(context.applicationContext, this)
     private var listo = false
@@ -84,10 +84,10 @@ class VoiceAssistant(
         }
     }
 
-    override fun reproducirMensaje(numeroMensaje: Int) =
+    fun reproducirMensaje(numeroMensaje: Int) =
         reproducirMensaje(numeroMensaje, {})
 
-    override fun reproducirMensaje(numeroMensaje: Int, onFinish: () -> Unit) {
+    fun reproducirMensaje(numeroMensaje: Int, onFinish: () -> Unit) {
         val texto = CATALOGO[numeroMensaje]
         if (texto == null) {
             Log.w(TAG, "Mensaje #$numeroMensaje no existe en el catálogo")
@@ -103,7 +103,7 @@ class VoiceAssistant(
         tts?.speak(texto, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
     }
 
-    override fun detener() {
+    fun detener() {
         // Clear callbacks before stop() so the onStop listener discards them, not onDone
         pendingCallbacks.clear()
         tts?.stop()
