@@ -22,7 +22,7 @@ object KigoApi {
     var baseUrl = "http://127.0.0.1:3000/api/v1"
 
     // version_modelo que guarda el backend junto al vector biometrico.
-    const val VERSION_MODELO = "mobilefacenet-192"
+    const val VERSION_MODELO = "mobilefacenet-128"
 
     fun listEmpresas(): List<Empresa> {
         val arr = JSONObject(get("/empresas?limit=100")).optJSONArray("data") ?: JSONArray()

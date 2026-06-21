@@ -45,10 +45,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        FaceStorage.cargar(this).forEach { (nombre, vectores) ->
-            personasDB[nombre] = vectores
-        }
-
         // Cache local primero (display instantaneo), luego refresco desde backend.
         personas.value = AdminStorage.cargarPersonas(this)
         empresas.value = AdminStorage.cargarEmpresas(this)
@@ -148,7 +144,6 @@ class MainActivity : ComponentActivity() {
     private fun savePerson(nombre: String, vector: List<Float>) {
         if (nombre.isBlank() || vector.isEmpty()) return
         personasDB.getOrPut(nombre) { mutableListOf() }.add(vector)
-        FaceStorage.guardar(this, personasDB)
     }
 
     @SuppressLint("UnsafeOptInUsageError")

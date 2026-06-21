@@ -28,6 +28,23 @@ cd Front-Kotlin
 4. **Run ▶** (Shift+F10)
 5. Conceder permisos de **Cámara** y **Micrófono** cuando la app los solicite
 
+### Conectar al backend local (IMPORTANTE)
+
+`baseUrl` por defecto es `http://127.0.0.1:3000/api/v1` (ver `KigoApi.kt`). En un
+teléfono físico, `127.0.0.1` es el propio teléfono, no tu PC. Según cómo corras:
+
+- **Teléfono por cable (USB):** redirigir el puerto del PC al teléfono con `adb reverse`:
+  ```bash
+  adb reverse tcp:3000 tcp:3000
+  adb reverse --list   # verificar
+  ```
+  Mantener `baseUrl = http://127.0.0.1:3000/api/v1`.
+  Se borra al desconectar el cable o reiniciar adb → re-ejecutar si falla la conexión.
+- **Emulador:** `baseUrl = http://10.0.2.2:3000/api/v1`.
+- **Misma WiFi que el PC:** `baseUrl = http://<IP-del-PC>:3000/api/v1` (ej. `192.168.x.x`).
+
+Síntoma de que falta el reverse: `error to connect 127.0.0.1:3000` / `Failed to connect`.
+
 ---
 
 ## Flujo de la app
@@ -227,3 +244,7 @@ kotlinOptions { jvmTarget = "11" }
 
 **Gradle no sincroniza**
 → File → Invalidate Caches → Invalidate and Restart
+
+**`error to connect 127.0.0.1:3000` / la app no llega al backend**
+→ Teléfono por cable: falta el reverse. Ejecutar `adb reverse tcp:3000 tcp:3000`.
+  Ver [Conectar al backend local](#conectar-al-backend-local-importante).
