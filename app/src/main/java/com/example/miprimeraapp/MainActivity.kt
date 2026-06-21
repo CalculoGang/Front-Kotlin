@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -36,6 +37,7 @@ class MainActivity : ComponentActivity() {
     private val empresas       = mutableStateOf<List<Empresa>>(emptyList())
 
     private val cameraExecutor = Executors.newSingleThreadExecutor()
+    private val netExecutor    = Executors.newSingleThreadExecutor()
     private var faceDetector: FaceDetector? = null
     private var faceEmbedder: FaceEmbedder? = null
 
@@ -47,8 +49,10 @@ class MainActivity : ComponentActivity() {
             personasDB[nombre] = vectores
         }
 
+        // Cache local primero (display instantaneo), luego refresco desde backend.
         personas.value = AdminStorage.cargarPersonas(this)
         empresas.value = AdminStorage.cargarEmpresas(this)
+        refrescarDesdeBackend()
 
         try {
             faceEmbedder = FaceEmbedder(this)
@@ -83,17 +87,63 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun addPersona(persona: Persona) {
+    private fun refrescarDesdeBackend() {
+        netExecutor.execute {
+            try {
+                val emp = KigoApi.listEmpresas()
+                val per = KigoApi.listPersonas()
+                runOnUiThread {
+                    empresas.value = emp
+                    personas.value = per
+                    AdminStorage.guardar(this, per, emp)
+                }
+            } catch (e: Exception) {
+                Log.e("KigoApi", "refresh fallo: ${e.message}")
+            }
+        }
+    }
+
+    // vector = 192 floats biometricos capturados en AdminScreen (puede ir vacio).
+    private fun addPersona(persona: Persona, vector: List<Float>) {
         if (persona.nombre.isBlank()) return
-        personas.value = personas.value + persona
-        AdminStorage.guardar(this, personas.value, empresas.value)
+        // persona.empresa trae el NOMBRE seleccionado; backend necesita el empresa_id (UUID).
+        val empresaId = empresas.value.find { it.nombre == persona.empresa }?.id
+        if (empresaId.isNullOrBlank()) {
+            toast("Empresa sin id de backend; sincroniza empresas primero")
+            return
+        }
+        netExecutor.execute {
+            try {
+                KigoApi.createPersona(persona, empresaId, vector)
+                val per = KigoApi.listPersonas()
+                runOnUiThread {
+                    personas.value = per
+                    AdminStorage.guardar(this, personas.value, empresas.value)
+                }
+            } catch (e: Exception) {
+                Log.e("KigoApi", "createPersona fallo: ${e.message}")
+                runOnUiThread { toast("No se pudo crear persona: ${e.message}") }
+            }
+        }
     }
 
     private fun addEmpresa(empresa: Empresa) {
         if (empresa.nombre.isBlank()) return
-        empresas.value = empresas.value + empresa
-        AdminStorage.guardar(this, personas.value, empresas.value)
+        netExecutor.execute {
+            try {
+                val creada = KigoApi.createEmpresa(empresa)
+                runOnUiThread {
+                    empresas.value = empresas.value + creada
+                    AdminStorage.guardar(this, personas.value, empresas.value)
+                }
+            } catch (e: Exception) {
+                Log.e("KigoApi", "createEmpresa fallo: ${e.message}")
+                runOnUiThread { toast("No se pudo crear empresa: ${e.message}") }
+            }
+        }
     }
+
+    private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
 
     private fun savePerson(nombre: String, vector: List<Float>) {
         if (nombre.isBlank() || vector.isEmpty()) return
@@ -158,6 +208,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         cameraExecutor.shutdown()
+        netExecutor.shutdown()
         faceDetector?.close()
         faceEmbedder?.close()
     }

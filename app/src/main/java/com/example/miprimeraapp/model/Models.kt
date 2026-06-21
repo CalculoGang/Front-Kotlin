@@ -2,8 +2,9 @@ package com.example.miprimeraapp.model
 
 enum class AppScreen { WELCOME, MODE_SELECT, TOUCH_FORM, VOICE, SUCCESS, SPEECH_TEST, ADMIN }
 
-// Mapea tabla `empresas` del backend (sin id/timestamps — los pone el backend).
+// Mapea tabla `empresas` del backend. `id` (UUID) lo asigna el backend; vacio = aun no sincronizado.
 data class Empresa(
+    val id               : String  = "",
     val nombre           : String  = "",
     val tipo             : String  = "",
     val direccion        : String  = "",
@@ -15,9 +16,10 @@ data class Empresa(
 // Mapea tabla `personas` + campos dinamicos (`persona_campos`: telefono, correo).
 // `empresa` referencia la empresa dueña (empresa_id); local guarda el nombre.
 data class Persona(
+    val id                 : String = "",          // UUID backend; vacio = local
     val nombre             : String = "",
     val tipo               : String = "visitante", // 'visitante' | 'proveedor' | 'empleado'
-    val empresa            : String = "",          // empresa_id (local: nombre de empresa)
+    val empresa            : String = "",          // del backend = empresa_id; del form = nombre de empresa
     val empresaOrigen      : String = "",
     val tipoIdentificacion : String = "",
     val telefono           : String = "",          // persona_campos

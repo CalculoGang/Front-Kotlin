@@ -23,7 +23,7 @@ fun KigoApp(
     onSetupCamera : (PreviewView) -> Unit,
     personas      : List<Persona>,
     empresas      : List<Empresa>,
-    onAddPersona  : (Persona) -> Unit,
+    onAddPersona  : (Persona, List<Float>) -> Unit,
     onAddEmpresa  : (Empresa) -> Unit
 ) {
     when (currentScreen) {
@@ -60,11 +60,13 @@ fun KigoApp(
             onBack = { onNavigate(AppScreen.WELCOME) }
         )
         AppScreen.ADMIN       -> AdminScreen(
-            personas     = personas,
-            empresas     = empresas,
-            onAddPersona = onAddPersona,
-            onAddEmpresa = onAddEmpresa,
-            onBack       = { onNavigate(AppScreen.WELCOME) }
+            personas      = personas,
+            empresas      = empresas,
+            faceUIState   = faceUIState,
+            onSetupCamera = onSetupCamera,
+            onAddPersona  = onAddPersona,
+            onAddEmpresa  = onAddEmpresa,
+            onBack        = { onNavigate(AppScreen.WELCOME) }
         )
     }
 }
