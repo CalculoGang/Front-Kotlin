@@ -41,6 +41,12 @@ class MainActivity : ComponentActivity() {
     private var faceDetector: FaceDetector? = null
     private var faceEmbedder: FaceEmbedder? = null
 
+    // Throttle del lookup biometrico al backend: el analyzer corre por-frame (muchos/seg),
+    // pero solo consultamos cada FACE_QUERY_MS y nunca con una consulta en vuelo.
+    @Volatile private var faceQueryInFlight = false
+    @Volatile private var lastFaceQueryMs   = 0L
+    @Volatile private var ultimoNombre      : String? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -179,19 +185,44 @@ class MainActivity : ComponentActivity() {
                         val bmp  = ImageUtils.rotate(ImageUtils.toBitmap(imageProxy), imageProxy.imageInfo.rotationDegrees)
                         val face = ImageUtils.cropFace(bmp, rostros[0].boundingBox)
                         if (face != null) {
-                            val vector          = embedder.embed(face).toList()
-                            val (nombre, dist)  = FaceRecognitionEngine.reconocer(vector, personasDB)
-                            faceUIState.value   = FaceUIState(hayRostro = true, vector = vector, nombreReconocido = nombre, distancia = dist)
+                            val vector = embedder.embed(face).toList()
+                            // Mantener el ultimo nombre conocido entre consultas (evita parpadeo).
+                            faceUIState.value = FaceUIState(hayRostro = true, vector = vector, nombreReconocido = ultimoNombre)
+                            consultarRostroBackend(vector)
                         }
                     } catch (e: Exception) {
                         Log.e("FaceEmbed", "Error generando embedding: ${e.message}")
                     }
                 } else {
+                    ultimoNombre = null
                     faceUIState.value = FaceUIState(hayRostro = false)
                 }
             }
             ?.addOnFailureListener { Log.e("FaceDetect", "Error: ${it.message}") }
             ?.addOnCompleteListener { imageProxy.close() }
+    }
+
+    // Consulta el backend por el vector facial, con throttle. Corre en netExecutor.
+    private fun consultarRostroBackend(vector: List<Float>) {
+        val now = System.currentTimeMillis()
+        if (faceQueryInFlight || now - lastFaceQueryMs < FACE_QUERY_MS) return
+        faceQueryInFlight = true
+        lastFaceQueryMs   = now
+        netExecutor.execute {
+            try {
+                val persona = KigoApi.buscarPorRostro(vector)
+                ultimoNombre = persona?.nombre
+                runOnUiThread {
+                    // Solo refrescar el nombre si seguimos viendo un rostro.
+                    val s = faceUIState.value
+                    if (s.hayRostro) faceUIState.value = s.copy(nombreReconocido = ultimoNombre)
+                }
+            } catch (e: Exception) {
+                Log.e("KigoApi", "buscarPorRostro fallo: ${e.message}")
+            } finally {
+                faceQueryInFlight = false
+            }
+        }
     }
 
     private fun requestCameraPermission() {
@@ -206,5 +237,9 @@ class MainActivity : ComponentActivity() {
         netExecutor.shutdown()
         faceDetector?.close()
         faceEmbedder?.close()
+    }
+
+    companion object {
+        private const val FACE_QUERY_MS = 1200L  // intervalo minimo entre lookups al backend
     }
 }

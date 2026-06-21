@@ -103,6 +103,16 @@ class VoiceAssistant(
         tts?.speak(texto, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
     }
 
+    /** Habla un texto libre (ej. "Hola Juan") sin pasar por el catálogo. */
+    fun reproducirTexto(texto: String, utteranceId: String, onFinish: () -> Unit = {}) {
+        if (!listo) {
+            Log.w(TAG, "TTS aún no está listo — omitiendo texto libre")
+            return
+        }
+        pendingCallbacks[utteranceId] = onFinish
+        tts?.speak(texto, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+    }
+
     fun detener() {
         // Clear callbacks before stop() so the onStop listener discards them, not onDone
         pendingCallbacks.clear()
@@ -120,10 +130,6 @@ class VoiceAssistant(
     companion object {
         private const val TAG = "VoiceAssistant"
 
-        // TODO: Para mensajes con datos dinámicos (ej. nombre extraído por OCR), añadir
-        //       una sobrecarga `reproducirTexto(texto: String)` que llame directamente a
-        //       tts.speak() sin pasar por el catálogo. No implementar aún — evitar
-        //       sobreingeniería en esta etapa.
         val CATALOGO: Map<Int, String> = mapOf(
             1  to "¡Bienvenido a tu comunidad! Soy Kigo, tu asistente de registro. ¿En qué idioma prefieres continuar?",
             2  to "¿Cómo deseas interactuar hoy? Puedes tocar la pantalla o puedes hablarme directamente.",

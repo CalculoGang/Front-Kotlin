@@ -58,6 +58,27 @@ object KigoApi {
         return personaFrom(JSONObject(post("/personas", body)))
     }
 
+    /**
+     * Identifica una persona por su vector facial (POST /personas/buscar-rostro).
+     * Devuelve la Persona reconocida o null si no hay match / error de red.
+     * Exige exactamente 128 dims: el backend usa vector(128) y rechaza otros tamaños.
+     */
+    fun buscarPorRostro(vector: List<Float>): Persona? {
+        if (vector.size != 128) {
+            android.util.Log.w("KigoApi", "vector_facial=${vector.size} dims; backend exige 128. Modelo .tflite no coincide.")
+            return null
+        }
+        return try {
+            val body = JSONObject().put("vector_facial", JSONArray(vector))
+            val resp = JSONObject(post("/personas/buscar-rostro", body))
+            if (resp.optBoolean("reconocido")) personaFrom(resp.getJSONObject("persona")) else null
+        } catch (e: Exception) {
+            // 404 = sin coincidencia (backend devuelve reconocido:false); red caida = transitorio.
+            // En ambos casos: tratar como desconocido. ponytail: sin distinguir, es un poll por-frame.
+            null
+        }
+    }
+
     // ─── mapeo JSON → modelo ──────────────────────────────────────────────────
     private fun empresaFrom(o: JSONObject) = Empresa(
         id               = o.optString("id"),

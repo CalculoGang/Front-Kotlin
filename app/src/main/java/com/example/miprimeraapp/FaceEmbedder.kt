@@ -2,6 +2,7 @@ package com.example.miprimeraapp
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
 import org.tensorflow.lite.Interpreter
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -31,6 +32,8 @@ class FaceEmbedder(context: Context, modelAsset: String = "mobilefacenet.tflite"
         inputSize = inShape[1]
         val outShape = interpreter.getOutputTensor(0).shape() // [1, N]
         embeddingSize = outShape[outShape.size - 1]
+        // El backend exige vector(128). Si esto NO imprime 128, el modelo no coincide.
+        Log.i("FaceEmbedder", "inputSize=$inputSize embeddingSize=$embeddingSize (backend espera 128)")
     }
 
     /** Returns an L2-normalized embedding for the cropped face bitmap. */

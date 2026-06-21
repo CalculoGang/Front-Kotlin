@@ -181,6 +181,21 @@ fun VoiceScreen(
         mostrarDialogo = true
     }
 
+    // Saludar por voz al reconocer una cara. Solo una vez por nombre, y sin pisar
+    // a Kigo si esta hablando o el micro esta activo (evita capturar su propia voz).
+    var ultimoSaludado by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(faceUIState.nombreReconocido) {
+        val nombre = faceUIState.nombreReconocido
+        if (nombre != null && nombre != ultimoSaludado && !kigoHablando && !micActive) {
+            ultimoSaludado = nombre
+            kigoHablando   = true
+            asistente?.reproducirTexto("Hola $nombre", "saludo_$nombre") {
+                kigoHablando = false
+            }
+        }
+        if (nombre == null) ultimoSaludado = null  // reset al perder la cara
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
