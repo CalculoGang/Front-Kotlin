@@ -3,7 +3,9 @@ package com.example.kigoapp.ui.components.admin
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
@@ -33,7 +35,8 @@ internal fun PersonasTab(
     empresas      : List<Empresa>,
     faceUIState   : FaceUIState,
     onSetupCamera : (PreviewView) -> Unit,
-    onAdd         : (Persona, List<List<Float>>) -> Unit
+    onAdd         : (Persona, List<List<Float>>) -> Unit,
+    isLandscape   : Boolean = false
 ) {
     var nombre        by remember { mutableStateOf("") }
     var tipo          by remember { mutableStateOf("visitante") }
@@ -46,7 +49,7 @@ internal fun PersonasTab(
 
     val nombresEmpresas = empresas.map { it.nombre }
 
-    FormCard {
+    val formContent: @Composable ColumnScope.() -> Unit = {
         FormSectionTitle("👤", "Nueva persona", KigoColors.VisitBlue)
 
         if (nombresEmpresas.isEmpty()) {
@@ -69,6 +72,7 @@ internal fun PersonasTab(
             faceUIState   = faceUIState,
             onSetupCamera = onSetupCamera,
             muestrasCount = muestras.size,
+            isLandscape   = isLandscape,
             onCapture     = { if (faceUIState.vector.isNotEmpty()) muestras = muestras + listOf(faceUIState.vector) },
             onLimpiar     = { muestras = emptyList() }
         )
@@ -92,11 +96,7 @@ internal fun PersonasTab(
         }
     }
 
-    ListCard(
-        title     = "Personas registradas",
-        empty     = personas.isEmpty(),
-        emptyText = "Aún no hay personas."
-    ) {
+    val listContent: @Composable ColumnScope.() -> Unit = {
         personas.forEach { p ->
             val empresaNombre = empresas.find { it.id == p.empresa }?.nombre ?: p.empresa
             RecordRow(
@@ -109,6 +109,39 @@ internal fun PersonasTab(
             )
         }
     }
+
+    if (isLandscape) {
+        Row(
+            modifier              = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(
+                modifier            = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                FormCard(content = formContent)
+            }
+            Column(
+                modifier            = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                ListCard(
+                    title     = "Personas registradas",
+                    empty     = personas.isEmpty(),
+                    emptyText = "Aún no hay personas.",
+                    content   = listContent
+                )
+            }
+        }
+    } else {
+        FormCard(content = formContent)
+        ListCard(
+            title     = "Personas registradas",
+            empty     = personas.isEmpty(),
+            emptyText = "Aún no hay personas.",
+            content   = listContent
+        )
+    }
 }
 
 @Composable
@@ -116,6 +149,7 @@ private fun FaceCaptureBlock(
     faceUIState   : FaceUIState,
     onSetupCamera : (PreviewView) -> Unit,
     muestrasCount : Int,
+    isLandscape   : Boolean,
     onCapture     : () -> Unit,
     onLimpiar     : () -> Unit
 ) {
@@ -123,7 +157,8 @@ private fun FaceCaptureBlock(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(9f / 16f)
+            // Portrait: tall 9:16. Landscape: wider 4:3 to avoid dominating half-pane.
+            .aspectRatio(if (isLandscape) 4f / 3f else 9f / 16f)
             .clip(RoundedCornerShape(16.dp))
             .background(Color(0xFF17172A))
     ) {
