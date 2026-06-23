@@ -14,33 +14,6 @@ import kotlin.math.sqrt
  */
 object FaceRecognitionEngine {
 
-    fun distancia(v1: List<Float>, v2: List<Float>): Float {
-        if (v1.size != v2.size || v1.isEmpty()) return Float.MAX_VALUE
-        var dot = 0f
-        for (i in v1.indices) dot += v1[i] * v2[i]
-        return 1f - dot
-    }
-
-    fun reconocer(
-        vector: List<Float>,
-        personas: Map<String, List<List<Float>>>,
-        umbral: Float = 0.40f
-    ): Pair<String?, Float> {
-        var mejorNombre: String? = null
-        var mejorDist = Float.MAX_VALUE
-
-        for ((nombre, vectores) in personas) {
-            val centroid = promediar(vectores) ?: continue
-            val d = distancia(vector, centroid)
-            if (d < mejorDist) {
-                mejorDist = d
-                mejorNombre = nombre
-            }
-        }
-
-        return Pair(if (mejorDist <= umbral) mejorNombre else null, mejorDist)
-    }
-
     /** Mean of the embeddings, re-normalized to unit length (null if empty). */
     fun promediar(vectores: List<List<Float>>): List<Float>? {
         if (vectores.isEmpty()) return null

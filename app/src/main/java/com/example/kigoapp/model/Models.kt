@@ -1,6 +1,6 @@
 package com.example.kigoapp.model
 
-enum class AppScreen { WELCOME, MODE_SELECT, TOUCH_FORM, VOICE, SUCCESS, SPEECH_TEST, ADMIN }
+enum class AppScreen { WELCOME, MODE_SELECT, TOUCH_FORM, VOICE, SUCCESS, ADMIN }
 
 // Mapea tabla `empresas` del backend. `id` (UUID) lo asigna el backend; vacio = aun no sincronizado.
 data class Empresa(

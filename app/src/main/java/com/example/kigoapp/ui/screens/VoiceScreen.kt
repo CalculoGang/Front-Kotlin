@@ -237,8 +237,7 @@ fun VoiceScreen(
                             .fillMaxHeight()
                     ) {
                         GlassChatCard(
-                            messages     = messages,
-                            quickActions = listOf("Llamar a David", "Cancelar visita"),
+                            messages = messages,
                             modifier     = Modifier
                                 .fillMaxSize()
                                 .padding(end = 20.dp, top = mascotSize * 0.52f, bottom = 8.dp)
@@ -305,8 +304,7 @@ fun VoiceScreen(
                             .height(chatHeight)
                     ) {
                         GlassChatCard(
-                            messages     = messages,
-                            quickActions = listOf("Llamar a David", "Cancelar visita"),
+                            messages = messages,
                             modifier     = Modifier
                                 .fillMaxSize()
                                 .padding(horizontal = 14.dp)
@@ -505,34 +503,16 @@ private fun MascotImage(modifier: Modifier = Modifier) {
 
 @Composable
 private fun GlassChatCard(
-    messages     : List<ChatMessage>,
-    quickActions : List<String>,
-    modifier     : Modifier = Modifier
+    messages : List<ChatMessage>,
+    modifier : Modifier = Modifier
 ) {
-    Column(
+    ConversationList(
+        messages = messages,
         modifier = modifier
             .shadow(8.dp, RoundedCornerShape(28.dp), ambientColor = Color.Black.copy(alpha = 0.07f))
             .clip(RoundedCornerShape(28.dp))
             .background(Color.White.copy(alpha = 0.88f))
-    ) {
-        ConversationList(
-            messages = messages,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-        )
-
-        Row(
-            modifier = Modifier
-                .horizontalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            quickActions.forEach { label ->
-                QuickActionChip(label = label, onClick = {})
-            }
-        }
-    }
+    )
 }
 
 // ─── Bottom navigation ────────────────────────────────────────────────────────

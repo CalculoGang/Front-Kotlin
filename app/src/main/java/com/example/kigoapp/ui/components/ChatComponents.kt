@@ -254,24 +254,3 @@ fun TypingBubble() {
         }
     }
 }
-
-// ─── Quick action chip ────────────────────────────────────────────────────────
-
-@Composable
-fun QuickActionChip(label: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(KigoColors.AppBg)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium,
-            color = Color(0xFF4B5563)
-        )
-    }
-}

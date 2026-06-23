@@ -31,7 +31,6 @@ fun KigoApp(
     when (currentScreen) {
         AppScreen.WELCOME     -> WelcomeScreen(
             onStart       = { onNavigate(AppScreen.MODE_SELECT) },
-            onTestSpeech  = { onNavigate(AppScreen.SPEECH_TEST) },
             onAdmin       = { onNavigate(AppScreen.ADMIN) },
             backendOnline = backendOnline
         )
@@ -59,9 +58,6 @@ fun KigoApp(
                 onFormUpdate(TouchFormData())
                 onNavigate(AppScreen.WELCOME)
             }
-        )
-        AppScreen.SPEECH_TEST -> SpeechTestScreen(
-            onBack = { onNavigate(AppScreen.WELCOME) }
         )
         AppScreen.ADMIN       -> AdminScreen(
             personas      = personas,

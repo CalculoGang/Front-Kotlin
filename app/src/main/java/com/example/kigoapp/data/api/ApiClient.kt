@@ -18,6 +18,17 @@ object ApiClient {
     // versión del modelo que guarda el backend junto al vector biométrico
     const val VERSION_MODELO = "mobilefacenet-128"
 
+    /** GET /health — true si el backend responde 200. No lanza excepción. */
+    fun health(): Boolean = try {
+        val serverRoot = baseUrl.substringBefore("/api")
+        val conn = (URL("$serverRoot/health").openConnection() as HttpURLConnection).apply {
+            requestMethod  = "GET"
+            connectTimeout = 5000
+            readTimeout    = 5000
+        }
+        try { conn.responseCode in 200..299 } finally { conn.disconnect() }
+    } catch (e: Exception) { false }
+
     internal fun get(path: String) = request("GET", path, null)
     internal fun post(path: String, body: JSONObject) = request("POST", path, body)
 

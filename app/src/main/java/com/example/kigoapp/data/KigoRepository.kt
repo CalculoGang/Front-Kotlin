@@ -1,7 +1,7 @@
 package com.example.kigoapp.data
 
+import com.example.kigoapp.data.api.ApiClient
 import com.example.kigoapp.data.api.empresas.EmpresasApi
-import com.example.kigoapp.data.api.health.HealthApi
 import com.example.kigoapp.data.api.personas.PersonasApi
 import com.example.kigoapp.model.Empresa
 import com.example.kigoapp.model.Persona
@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 
 class KigoRepository {
 
-    suspend fun health(): Boolean = withContext(Dispatchers.IO) { HealthApi.health() }
+    suspend fun health(): Boolean = withContext(Dispatchers.IO) { ApiClient.health() }
 
     suspend fun refrescar(): Pair<List<Persona>, List<Empresa>> = withContext(Dispatchers.IO) {
         PersonasApi.listPersonas() to EmpresasApi.listEmpresas()
