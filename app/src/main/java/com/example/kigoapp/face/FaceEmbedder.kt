@@ -1,4 +1,4 @@
-package com.example.kigoapp
+package com.example.kigoapp.face
 
 import android.content.Context
 import android.graphics.Bitmap

@@ -17,6 +17,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.example.kigoapp.data.KigoRepository
+import com.example.kigoapp.face.FaceEmbedder
 import com.example.kigoapp.face.FacePipeline
 import com.example.kigoapp.vm.KigoViewModel
 import com.google.mlkit.vision.face.FaceDetection

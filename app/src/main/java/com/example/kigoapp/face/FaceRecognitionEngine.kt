@@ -1,4 +1,4 @@
-package com.example.kigoapp
+package com.example.kigoapp.face
 
 import kotlin.math.sqrt
 
