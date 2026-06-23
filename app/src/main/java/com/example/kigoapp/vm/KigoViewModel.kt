@@ -21,10 +21,11 @@ import kotlinx.coroutines.launch
 
 /** Estado de pantalla/datos. `faceState` va aparte: se actualiza por-frame. */
 data class KigoUiState(
-    val screen   : AppScreen     = AppScreen.WELCOME,
-    val form     : TouchFormData = TouchFormData(),
-    val personas : List<Persona> = emptyList(),
-    val empresas : List<Empresa> = emptyList()
+    val screen        : AppScreen     = AppScreen.WELCOME,
+    val form          : TouchFormData = TouchFormData(),
+    val personas      : List<Persona> = emptyList(),
+    val empresas      : List<Empresa> = emptyList(),
+    val backendOnline : Boolean?      = null   // null = verificando
 )
 
 /**
@@ -51,6 +52,10 @@ class KigoViewModel(private val repo: KigoRepository) : ViewModel() {
     @Volatile private var ultimaPersonaId   : String? = null
 
     init {
+        viewModelScope.launch {
+            val online = repo.health()
+            _uiState.update { it.copy(backendOnline = online) }
+        }
         viewModelScope.launch {
             runCatching { repo.refrescar() }
                 .onSuccess { (p, e) -> _uiState.update { s -> s.copy(personas = p, empresas = e) } }
@@ -117,12 +122,20 @@ class KigoViewModel(private val repo: KigoRepository) : ViewModel() {
      * El VM es dueño del nombre reconocido (lo pone el backend) y dispara el lookup.
      */
     fun onFaceDetected(hayRostro: Boolean, vector: List<Float>) {
+        val reconocerActivo = _uiState.value.screen == AppScreen.VOICE
         when {
             hayRostro && vector.isNotEmpty() -> {
-                _faceState.value = FaceUIState(hayRostro = true, vector = vector, nombreReconocido = ultimoNombre)
-                consultarRostro(vector)
+                _faceState.value = FaceUIState(
+                    hayRostro        = true,
+                    vector           = vector,
+                    nombreReconocido = if (reconocerActivo) ultimoNombre else null
+                )
+                if (reconocerActivo) consultarRostro(vector)
             }
-            hayRostro -> _faceState.value = FaceUIState(hayRostro = true, nombreReconocido = ultimoNombre)
+            hayRostro -> _faceState.value = FaceUIState(
+                hayRostro        = true,
+                nombreReconocido = if (reconocerActivo) ultimoNombre else null
+            )
             else -> {
                 ultimoNombre = null; ultimaPersonaId = null
                 _faceState.value = FaceUIState(hayRostro = false)
