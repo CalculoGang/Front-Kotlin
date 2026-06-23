@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.miprimeraapp"
+    namespace = "com.example.kigoapp"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.miprimeraapp"
+        applicationId = "com.example.kigoapp"
         minSdk = 24
         targetSdk = 35
         versionCode = 1
