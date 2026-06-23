@@ -26,7 +26,7 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun WelcomeScreen(onStart: () -> Unit, onTestSpeech: () -> Unit = {}, onAdmin: () -> Unit = {}) {
+fun WelcomeScreen(onStart: () -> Unit, onTestSpeech: () -> Unit = {}, onAdmin: () -> Unit = {}, backendOnline: Boolean? = null) {
     var timeText by remember { mutableStateOf(currentTime()) }
     LaunchedEffect(Unit) {
         while (true) { delay(1000); timeText = currentTime() }
@@ -58,7 +58,7 @@ fun WelcomeScreen(onStart: () -> Unit, onTestSpeech: () -> Unit = {}, onAdmin: (
                 )
             }
 
-            LiveClockPill(timeText)
+            LiveClockPill(timeText, backendOnline)
 
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
@@ -115,7 +115,17 @@ private fun KigoLogo() {
 }
 
 @Composable
-private fun LiveClockPill(timeText: String) {
+private fun LiveClockPill(timeText: String, backendOnline: Boolean?) {
+    val dotColor = when (backendOnline) {
+        true  -> KigoColors.VoiceGreen
+        false -> KigoColors.KigoRed
+        null  -> Color.White.copy(alpha = 0.4f)
+    }
+    val statusLabel = when (backendOnline) {
+        true  -> "Backend conectado"
+        false -> "Backend sin conexión"
+        null  -> "Verificando..."
+    }
     Row(
         modifier = Modifier
             .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
@@ -124,8 +134,8 @@ private fun LiveClockPill(timeText: String) {
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Box(Modifier.size(8.dp).background(KigoColors.VoiceGreen, CircleShape))
-        Text("$timeText · Sistema activo", color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
+        Box(Modifier.size(8.dp).background(dotColor, CircleShape))
+        Text("$timeText · $statusLabel", color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
     }
 }
 

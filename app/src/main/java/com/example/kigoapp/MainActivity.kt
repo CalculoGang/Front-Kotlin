@@ -84,7 +84,8 @@ class MainActivity : ComponentActivity() {
                 personas         = ui.personas,
                 empresas         = ui.empresas,
                 onAddPersona     = viewModel::addPersona,
-                onAddEmpresa     = viewModel::addEmpresa
+                onAddEmpresa     = viewModel::addEmpresa,
+                backendOnline    = ui.backendOnline
             )
         }
     }

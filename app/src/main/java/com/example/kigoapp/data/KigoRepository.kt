@@ -8,6 +8,8 @@ import kotlinx.coroutines.withContext
 
 class KigoRepository {
 
+    suspend fun health(): Boolean = withContext(Dispatchers.IO) { KigoApi.health() }
+
     suspend fun refrescar(): Pair<List<Persona>, List<Empresa>> = withContext(Dispatchers.IO) {
         KigoApi.listPersonas() to KigoApi.listEmpresas()
     }

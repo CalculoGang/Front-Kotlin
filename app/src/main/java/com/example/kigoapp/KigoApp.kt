@@ -25,13 +25,15 @@ fun KigoApp(
     personas      : List<Persona>,
     empresas      : List<Empresa>,
     onAddPersona  : (Persona, List<List<Float>>) -> Unit,
-    onAddEmpresa  : (Empresa) -> Unit
+    onAddEmpresa  : (Empresa) -> Unit,
+    backendOnline : Boolean?  = null
 ) {
     when (currentScreen) {
         AppScreen.WELCOME     -> WelcomeScreen(
-            onStart      = { onNavigate(AppScreen.MODE_SELECT) },
-            onTestSpeech = { onNavigate(AppScreen.SPEECH_TEST) },
-            onAdmin      = { onNavigate(AppScreen.ADMIN) }
+            onStart       = { onNavigate(AppScreen.MODE_SELECT) },
+            onTestSpeech  = { onNavigate(AppScreen.SPEECH_TEST) },
+            onAdmin       = { onNavigate(AppScreen.ADMIN) },
+            backendOnline = backendOnline
         )
         AppScreen.MODE_SELECT -> ModeSelectScreen(
             onBack        = { onNavigate(AppScreen.WELCOME) },
