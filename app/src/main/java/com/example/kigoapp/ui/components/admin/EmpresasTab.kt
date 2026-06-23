@@ -1,4 +1,4 @@
-package com.example.kigoapp.ui.screens.admin
+package com.example.kigoapp.ui.components.admin
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Switch

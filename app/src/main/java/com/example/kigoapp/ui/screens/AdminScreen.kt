@@ -19,9 +19,9 @@ import com.example.kigoapp.model.Empresa
 import com.example.kigoapp.model.FaceUIState
 import com.example.kigoapp.model.Persona
 import com.example.kigoapp.ui.components.BackChip
-import com.example.kigoapp.ui.screens.admin.EmpresasTab
-import com.example.kigoapp.ui.screens.admin.PersonasTab
-import com.example.kigoapp.ui.screens.admin.TabButton
+import com.example.kigoapp.ui.components.admin.EmpresasTab
+import com.example.kigoapp.ui.components.admin.PersonasTab
+import com.example.kigoapp.ui.components.admin.TabButton
 import com.example.kigoapp.ui.theme.KigoColors
 
 private enum class AdminTab { PERSONAS, EMPRESAS }
