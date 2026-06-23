@@ -75,7 +75,7 @@ internal fun PersonasTab(
 
         SaveButton(enabled = nombre.isNotBlank() && empresa.isNotBlank() && muestras.isNotEmpty()) {
             onAdd(
-                FaceCaptureBlockPersona(
+                Persona(
                     nombre             = nombre.trim(),
                     tipo               = tipo,
                     empresa            = empresa,
@@ -123,7 +123,7 @@ private fun FaceCaptureBlock(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(16f / 9f)
+            .aspectRatio(9f / 16f)
             .clip(RoundedCornerShape(16.dp))
             .background(Color(0xFF17172A))
     ) {
